@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Help — Google AI Pro Automation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f3f4f7; --panel:#fff; --line:#e3e6eb; --line-soft:#eef0f4;
+    --ink:#12141a; --muted:#6b7280; --accent:#101318;
+    --ok:#15803d; --ok-bg:#e9f8ef;
+    --bad:#b42318; --bad-bg:#fdeceb; --bad-line:#f6ccc8;
+    --warn:#a15c07; --warn-bg:#fdf5e6; --warn-line:#f0e2bd;
+    --info:#1d4ed8; --info-bg:#e9effd;
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.04);
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{
+    margin:0; color:var(--ink); background:var(--bg);
+    font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  code{font:12px ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+       background:#f2f4f7; padding:.05rem .32rem; border-radius:4px}
+  header{
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.9rem;
+    flex-wrap:wrap; padding:.7rem 1.4rem; border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.8); backdrop-filter:saturate(180%) blur(14px);
+  }
+  .brand{display:flex; align-items:center; gap:.65rem}
+  .logo{width:26px;height:26px;border-radius:8px;flex:none;position:relative;
+        background:linear-gradient(140deg,#2f3a52,#101318 62%);
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+  .logo::after{content:"";position:absolute;inset:7px 6px;border-radius:3px;
+        border:1.5px solid rgba(255,255,255,.75);border-right-color:transparent;
+        border-bottom-color:transparent;transform:rotate(45deg)}
+  h1{font-size:14px;margin:0;font-weight:650}
+  .sub{font-size:11px;color:var(--muted);line-height:1.2}
+  .spacer{flex:1}
+  a.btn, button{
+    font:12px/1.4 inherit; font-weight:550; display:inline-block;
+    padding:.45rem .8rem; border:1px solid var(--line); border-radius:var(--radius-sm);
+    background:#fff; color:var(--ink); cursor:pointer; text-decoration:none;
+    box-shadow:0 1px 1px rgba(16,24,40,.04);
+  }
+  a.btn:hover, button:hover{background:#f6f7f9;border-color:#d5d9e1}
+  .langs{display:inline-flex;gap:.2rem}
+  .langs .btn{padding:.32rem .5rem;font-size:11px}
+  .langs .btn.on{border-color:#2f3a52;background:#eef1f6;font-weight:700}
+  main{max-width:900px; margin:0 auto; padding:1.2rem 1.4rem 3rem;
+       display:flex; flex-direction:column; gap:1rem}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+          box-shadow:var(--shadow);padding:1rem 1.15rem 1.15rem}
+  h2{display:flex;align-items:center;gap:.5rem;margin:0 0 .6rem;font-size:11px;
+     font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  h2::before{content:"";width:3px;height:12px;border-radius:2px;background:#2f3a52}
+  .lead{margin:0 0 .8rem;font-size:13px;line-height:1.65}
+  p{margin:.45rem 0}
+  ul,ol{margin:.35rem 0 .35rem 1.1rem;padding:0}
+  li{margin:.25rem 0}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;margin-top:.4rem}
+  th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.07em;
+     text-transform:uppercase;color:var(--muted);background:#fbfcfd;
+     border-bottom:1px solid var(--line);padding:.5rem .55rem}
+  td{padding:.5rem .55rem;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{width:2.2rem;color:var(--muted);font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+  .warn{background:var(--bad-bg);border:1px solid var(--bad-line);color:var(--bad);
+        border-radius:var(--radius-sm);padding:.6rem .75rem;font-size:12px;margin:.7rem 0 0}
+  footer{color:var(--muted);font-size:11.5px;text-align:center;padding-top:.5rem}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>Help</h1>
+      <div class="sub">Google AI Pro Automation</div>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <span class="langs" role="group" aria-label="language">
+    <a class="btn {{ 'on' if lang == 'en' }}" href="/lang/en?next=/help">EN</a>
+    <a class="btn {{ 'on' if lang == 'id' }}" href="/lang/id?next=/help">ID</a>
+  </span>
+  <a class="btn" href="/">back to console</a>
+</header>
+
+<main>
+
+<section>
+  <h2>What this app does</h2>
+  <p class="lead">It drives a real Chrome window through the whole Google AI Pro
+  offer for one account at a time, and it never commits anything it has not
+  checked on screen first. Accounts run one after another in a queue, each in its
+  own process, so a stuck browser cannot take the console down with it.</p>
+  <p>The short version: log in, bind a card when Google asks for one, take the
+  three stacked offers, confirm the end date after every step, cancel the
+  renewal, then take the card back off the account.</p>
+</section>
+
+<section>
+  <h2>The flow, step by step</h2>
+  <table>
+    <thead>
+      <tr><th class="num">#</th><th>Handler</th><th>What happens</th><th>Check before moving on</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">0</td>
+        <td><code>egress</code></td>
+        <td>Loads a small IP service inside the browser to see where traffic comes from.</td>
+        <td>Country must be <strong>US</strong>; waits up to 120 s, then stops.</td>
+      </tr>
+      <tr>
+        <td class="num">1</td>
+        <td><code>login</code></td>
+        <td>Email, password, TOTP — plus whatever screen Google puts in between
+            (captcha, recovery prompt, device prompt).</td>
+        <td>URL has left <code>accounts.google.com</code>.</td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td><code>discover</code></td>
+        <td>Reads the current end date from the cancel dialog without confirming
+            anything, then decides which offers are still available.</td>
+        <td>0 months → offer 1 · 12 → offer 2 · 18 → offer 3 · 24 → try offer 4 once.</td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td><code>bind card</code></td>
+        <td>If the dialog asks for a payment method: Add card → number, expiry,
+            CVC, holder, ZIP → Save.</td>
+        <td>Every field is read back; a value that did not stick is typed again.</td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td><code>offer 1</code></td>
+        <td>Opens the offer dialog, reads the total, presses Subscribe.</td>
+        <td><code>$0.00</code> or the 12-month trial label.</td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td><code>offer 2</code></td>
+        <td>Upgrades to the 18-month term.</td>
+        <td>End date lands within a day of +18 months.</td>
+      </tr>
+      <tr>
+        <td class="num">6</td>
+        <td><code>offer 3</code></td>
+        <td>Upgrades to the 24-month term.</td>
+        <td>End date lands within a day of +24 months.</td>
+      </tr>
+      <tr>
+        <td class="num">7</td>
+        <td><code>cancel</code></td>
+        <td>Play → Manage → Cancel subscription → confirm.</td>
+        <td>Status reads <code>Canceled</code> and the end date is visible.</td>
+      </tr>
+      <tr>
+        <td class="num">8</td>
+        <td><code>detach card</code></td>
+        <td>Removes the card from the account's payment profile. The card stays
+            in the vault for the next account.</td>
+        <td>Best effort — needs your approval on the phone, waited up to 300 s.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Input formats</h2>
+  <p>One item per line. Separators can be <code>|</code>, comma, semicolon, tab or spaces.</p>
+  <ul>
+    <li><strong>Card:</strong> <code>number|MM/YY|CVC</code> — for example
+        <code>4111111111111111|08/29|123</code>. Number and CVC go into the local
+        store; the screen only ever shows the last four digits.</li>
+    <li><strong>Account:</strong> <code>email|password|totp-secret</code>. Leave the
+        secret out for accounts without 2FA; spaces and lower case in the secret
+        are fine.</li>
+  </ul>
+  <p class="muted">Cards are shared on rotation: a new account takes the active card
+  that has gone longest unused. Disable a card once it stops working — accounts
+  using it get released.</p>
+</section>
+
+<section>
+  <h2>The accounts panel</h2>
+  <ul>
+    <li><strong>search / status filter</strong> — narrows the table only; it keeps
+        applying while statuses change.</li>
+    <li><strong>run selected</strong> — tick a few rows (or the header checkbox for
+        all) and queue them at once. Same serial queue as <em>run all</em>.</li>
+    <li><strong>log</strong> per row — the last five runs for that account: start
+        time, status, egress, why it failed, how many screenshots, and a
+        <em>show log</em> button for any of them. The history is stored in the
+        database, not just in file names.</li>
+    <li><strong>ends</strong> — the end date read during discovery or cancel.
+        <code>—</code> means it has not been read yet.</li>
+    <li><strong>eight dots</strong> next to the status — the handler step; the green
+        dot is the last one that ran.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Still needs a human</h2>
+  <ul>
+    <li><strong>Device prompt at login</strong> — Google asks you to confirm on your
+        phone. The run waits up to five minutes without counting it as a failure.</li>
+    <li><strong>Removing the card</strong> — the payments page only offers "tap Yes
+        on your phone". The run sends the request and waits up to 300 seconds.</li>
+    <li><strong>Image captcha</strong> — the checkbox is clicked automatically; if
+        Google escalates to a picture puzzle, solve it in the Chrome window.</li>
+  </ul>
+  <p class="muted">If you skip either approval, the subscription stays active and the
+  cancel still runs — only the card is left on the account.</p>
+</section>
+
+<section>
+  <h2>When it fails: read this line in the log</h2>
+  <table>
+    <thead><tr><th>Marker</th><th>Meaning</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td><code>EGRESS … ≠ US</code></td>
+          <td>Traffic is not US.</td>
+          <td>Turn the US VPN on and run again.</td></tr>
+      <tr><td><code>LOGIN  GAGAL</code></td>
+          <td>Login did not finish (password, TOTP or captcha).</td>
+          <td>Finish it by hand in the Chrome window, or fix the password/secret in the vault.</td></tr>
+      <tr><td><code>kolom CVC meleset</code></td>
+          <td>A field did not keep what was typed (browser autofill won).</td>
+          <td>The run retries by itself; if it persists, clear that account's Chrome profile.</td></tr>
+      <tr><td><code>tombol Add card tidak ditemukan</code></td>
+          <td>The dialog never rendered the card form.</td>
+          <td>Run again; check the <code>flow_L*.png</code> screenshot if it repeats.</td></tr>
+      <tr><td><code>Something went wrong</code></td>
+          <td>Google closed the upgrade path (usually the 24-month cap).</td>
+          <td>Normal for offer 4; the run continues to cancel.</td></tr>
+      <tr><td><code>cancel terverifikasi</code></td>
+          <td>Status <code>Canceled</code> and the end date were both read.</td>
+          <td>Nothing — the account is done.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Data &amp; privacy</h2>
+  <p>Everything lives in the data dir. No telemetry, and no outbound calls beyond
+  Google and <code>ipwho.is</code> (the country check):</p>
+  <p><code>{{ data_dir }}</code></p>
+  <ul>
+    <li><code>db.sqlite3</code> — account and card metadata (no card number, no CVC).</li>
+    <li><code>secrets.json</code> — passwords, TOTP secrets, card numbers, CVC (mode 0600).</li>
+    <li><code>console.token</code> — access token. Only used when the console is
+        opened beyond loopback (<code>GAI_ALLOW_REMOTE=1</code>) or with
+        <code>GAI_REQUIRE_TOKEN=1</code>; normally you just open
+        <code>http://127.0.0.1:8765/</code>.</li>
+    <li><code>profiles/</code> — one Chrome profile per account (login cookies).</li>
+    <li><code>artifacts/</code> — run logs and per-offer screenshots.</li>
+  </ul>
+  <div class="warn">Never commit the data dir. <code>secrets.json</code> holds
+  credentials in a form anyone who can read the file can use — the protection is
+  file permissions (0600 inside a 0700 directory), not a system keychain.</div>
+</section>
+
+<footer>
+  Built on and compared against:
+  <a href="https://github.com/worldonlyu/Google_AI_Pro_2Year_ZeroCost_Auto">zero-cost runner</a> ·
+  <a href="https://github.com/ade1256/google-ai-pro-farming-2-years">earlier console</a> ·
+  <a href="https://github.com/dennykrst/google-ai-pro-automation">this repo</a>
+</footer>
+
+</main>
+</body>
+</html>

@@ -94,10 +94,12 @@ def brand_of(number: str) -> str:
 
 
 # ── accounts ────────────────────────────────────────────────────────────────
-async def add_account(email: str, password: str, seed: str) -> tuple[bool, str]:
+async def add_account(email: str, password: str, seed: str) -> tuple[bool, str, str]:
+    """Simpan akun. Mengembalikan (ok, code, email) — bukan kalimat jadi, supaya
+    pesan yang tampil bisa diterjemahkan di lapisan UI (`app/i18n.py`)."""
     email = email.strip().lower()
     if not _EMAIL.match(email) or not password:
-        return False, f"baris tidak valid: {email or '(kosong)'}"
+        return False, "invalid", email
     row = await db.fetch_one("SELECT id FROM accounts WHERE email = ?", (email,))
     now = int(time.time())
     if row:
@@ -106,7 +108,7 @@ async def add_account(email: str, password: str, seed: str) -> tuple[bool, str]:
         if seed:
             secret_put(f"{acc_id}:totp", totp.normalize(seed))
         await db.execute("UPDATE accounts SET updated_at = ? WHERE id = ?", (now, acc_id))
-        return False, f"{email} sudah ada — diperbarui"
+        return False, "updated", email
 
     acc_id = "acc_" + _rand.token_hex(6)
     secret_put(f"{acc_id}:password", password)
@@ -118,7 +120,7 @@ async def add_account(email: str, password: str, seed: str) -> tuple[bool, str]:
         (acc_id, email, f"{acc_id}:password", f"{acc_id}:totp" if seed else "", "", now, now),
     )
     await attach_card(acc_id)
-    return True, f"{email} ditambahkan"
+    return True, "added", email
 
 
 async def backfill_cards() -> int:
@@ -132,18 +134,19 @@ async def backfill_cards() -> int:
 
 
 async def import_accounts(blob: str) -> list[str]:
-    notes: list[str] = []
+    """Kembalikan daftar kode: "added" · "updated" · "skipped"."""
+    codes: list[str] = []
     for raw in blob.splitlines():
         line = raw.strip()
         if not line:
             continue
         parsed = parse_account(line)
         if not parsed:
-            notes.append(f"dilewati: {line[:48]}")
+            codes.append("skipped")
             continue
-        ok, note = await add_account(*parsed)
-        notes.append(note)
-    return notes
+        _, code, _ = await add_account(*parsed)
+        codes.append(code)
+    return codes
 
 
 async def delete_account(acc_id: str) -> None:
@@ -153,14 +156,16 @@ async def delete_account(acc_id: str) -> None:
 
 
 # ── cards ───────────────────────────────────────────────────────────────────
-async def add_card(number: str, month: str, year: str, cvc: str) -> tuple[bool, str]:
+async def add_card(number: str, month: str, year: str, cvc: str) -> tuple[bool, str, str]:
+    """Simpan kartu. Mengembalikan (ok, code, label) — code: invalid/exists/added."""
     number = re.sub(r"[^\d]", "", number)
     if not _CARD_NUMBER.match(number):
-        return False, "nomor kartu tidak valid"
+        return False, "invalid", ""
+    label = f"{brand_of(number)}-{number[-4:]}"
     row = await db.fetch_one("SELECT id FROM cards WHERE last4 = ? AND exp_month = ? AND exp_year = ?",
                              (number[-4:], month, year))
     if row:
-        return False, f"{brand_of(number)}-{number[-4:]} sudah ada"
+        return False, "exists", label
 
     card_id = "card_" + _rand.token_hex(6)
     secret_put(f"{card_id}:number", number)
@@ -172,22 +177,23 @@ async def add_card(number: str, month: str, year: str, cvc: str) -> tuple[bool, 
          brand_of(number), month, year, int(time.time())),
     )
     await backfill_cards()
-    return True, f"{brand_of(number)}-{number[-4:]} ditambahkan"
+    return True, "added", label
 
 
 async def import_cards(blob: str) -> list[str]:
-    notes: list[str] = []
+    """Kembalikan daftar kode: "added" · "exists" · "skipped"."""
+    codes: list[str] = []
     for raw in blob.splitlines():
         line = raw.strip()
         if not line:
             continue
         parsed = parse_card(line)
         if not parsed:
-            notes.append(f"dilewati: {line[:48]}")
+            codes.append("skipped")
             continue
-        ok, note = await add_card(*parsed)
-        notes.append(note)
-    return notes
+        _, code, _ = await add_card(*parsed)
+        codes.append(code)
+    return codes
 
 
 async def kill_card(card_id: str, dead: bool = True) -> None:

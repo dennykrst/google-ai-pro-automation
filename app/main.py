@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -12,7 +13,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from urllib.parse import quote
 
-from . import db, runs, vault
+from . import db, i18n, runs, vault
 from .config import settings
 from .runner import queue
 from .security import COOKIE_NAME, guard_request
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", dependencies=guard)
     async def index(request: Request, msg: str = "", err: str = ""):
+        lang = i18n.resolve(request)
         resp = templates.TemplateResponse(
             request,
             "index.html",
@@ -69,19 +71,32 @@ def create_app() -> FastAPI:
                 "err": err,
                 "pending": queue.runner.pending,
                 "current": queue.runner.current,
+                "lang": lang,
+                "t": partial(i18n.t, lang=lang),
+                "js": i18n.js_strings(lang),
             },
         )
         if getattr(request.state, "set_cookie_token", None):
             resp.set_cookie(COOKIE_NAME, request.state.set_cookie_token, httponly=True, samesite="strict")
         return resp
 
+    @app.get("/lang/{code}")
+    async def set_language(code: str, next: str = "/"):
+        """Ganti bahasa UI (cookie), lalu kembali ke halaman semula."""
+        lang = code if code in i18n.LANGS else i18n.DEFAULT
+        target = next if next.startswith("/") and not next.startswith("//") else "/"
+        resp = RedirectResponse(target, status_code=303)
+        resp.set_cookie(i18n.LANG_COOKIE, lang, max_age=365 * 24 * 3600, samesite="lax")
+        return resp
+
     @app.get("/help", dependencies=guard)
     async def help_page(request: Request):
         """Panduan di dalam aplikasi: handler, format input, arti log, data dir."""
+        lang = i18n.resolve(request)
         resp = templates.TemplateResponse(
             request,
-            "help.html",
-            {"data_dir": str(settings.data_dir)},
+            f"help.{lang}.html",
+            {"data_dir": str(settings.data_dir), "lang": lang},
         )
         if getattr(request.state, "set_cookie_token", None):
             resp.set_cookie(COOKIE_NAME, request.state.set_cookie_token,
@@ -105,74 +120,87 @@ def create_app() -> FastAPI:
         return JSONResponse({"password": vault.secret_get(row["secret_ref"])})
 
     @app.post("/accounts/import", dependencies=guard)
-    async def accounts_import(blob: str = Form(default="")):
-        notes = await vault.import_accounts(blob)
-        added = sum(1 for n in notes if n.endswith("ditambahkan"))
-        unusable = len(notes) - added
-        text = f"{added} akun masuk" + (f", {unusable} dilewati" if unusable else "")
-        return _to(msg=text)
+    async def accounts_import(request: Request, blob: str = Form(default="")):
+        lang = i18n.resolve(request)
+        codes = await vault.import_accounts(blob)
+        added = sum(1 for c in codes if c == "added")
+        skipped = len(codes) - added
+        key = "msg.accounts_imported_skipped" if skipped else "msg.accounts_imported"
+        return _to(msg=i18n.t(key, lang, added=added, skipped=skipped))
 
     @app.post("/accounts/add", dependencies=guard)
-    async def accounts_add(email: str = Form(...), password: str = Form(...), seed: str = Form(default="")):
-        _, note = await vault.add_account(email, password, seed)
-        return _to(msg=note)
+    async def accounts_add(request: Request, email: str = Form(...), password: str = Form(...),
+                           seed: str = Form(default="")):
+        lang = i18n.resolve(request)
+        _, code, addr = await vault.add_account(email, password, seed)
+        if code == "invalid":
+            return _to(err=i18n.t("msg.account_invalid", lang, value=addr or "(empty)"))
+        return _to(msg=i18n.t(f"msg.account_{code}", lang, email=addr))
 
     @app.post("/accounts/{acc_id}/delete", dependencies=guard)
-    async def accounts_delete(acc_id: str):
+    async def accounts_delete(request: Request, acc_id: str):
         await vault.delete_account(acc_id)
-        return _to(msg="akun dihapus")
+        return _to(msg=i18n.t("msg.account_deleted", i18n.resolve(request)))
 
     @app.post("/cards/import", dependencies=guard)
-    async def cards_import(blob: str = Form(default="")):
-        notes = await vault.import_cards(blob)
-        added = sum(1 for n in notes if n.endswith("ditambahkan"))
-        unusable = len(notes) - added
-        text = f"{added} kartu masuk" + (f", {unusable} dilewati" if unusable else "")
-        return _to(msg=text)
+    async def cards_import(request: Request, blob: str = Form(default="")):
+        lang = i18n.resolve(request)
+        codes = await vault.import_cards(blob)
+        added = sum(1 for c in codes if c == "added")
+        skipped = len(codes) - added
+        key = "msg.cards_imported_skipped" if skipped else "msg.cards_imported"
+        return _to(msg=i18n.t(key, lang, added=added, skipped=skipped))
 
     @app.post("/cards/add", dependencies=guard)
-    async def cards_add(number: str = Form(...), exp: str = Form(...), cvc: str = Form(...)):
+    async def cards_add(request: Request, number: str = Form(...), exp: str = Form(...),
+                        cvc: str = Form(...)):
+        lang = i18n.resolve(request)
         parsed = vault.parse_card(f"{number}|{exp}|{cvc}")
         if not parsed:
-            return _to(err="format kartu tidak valid")
-        _, note = await vault.add_card(*parsed)
-        return _to(msg=note)
+            return _to(err=i18n.t("msg.card_bad_format", lang))
+        _, code, label = await vault.add_card(*parsed)
+        if code == "invalid":
+            return _to(err=i18n.t("msg.card_invalid", lang))
+        if code == "exists":
+            return _to(err=i18n.t("msg.card_exists", lang, label=label))
+        return _to(msg=i18n.t("msg.card_added", lang, label=label))
 
     @app.post("/cards/{card_id}/status", dependencies=guard)
-    async def cards_status(card_id: str, dead: int = Form(...)):
+    async def cards_status(request: Request, card_id: str, dead: int = Form(...)):
         await vault.kill_card(card_id, dead=bool(dead))
-        return _to(msg="status kartu diubah")
+        return _to(msg=i18n.t("msg.card_status", i18n.resolve(request)))
 
     @app.post("/cards/{card_id}/delete", dependencies=guard)
-    async def cards_delete(card_id: str):
+    async def cards_delete(request: Request, card_id: str):
         await vault.delete_card(card_id)
-        return _to(msg="kartu dihapus, akun dilepas")
+        return _to(msg=i18n.t("msg.card_deleted", i18n.resolve(request)))
 
     # ── runs ────────────────────────────────────────────────────────────────
     @app.post("/accounts/{acc_id}/run", dependencies=guard)
-    async def accounts_run(acc_id: str):
+    async def accounts_run(request: Request, acc_id: str):
+        lang = i18n.resolve(request)
         ok = await queue.runner.submit(acc_id)
-        return _to(msg='masuk antrean' if ok else 'sudah antre/running')
+        return _to(msg=i18n.t("msg.queue_ok" if ok else "msg.queue_dup", lang))
 
     @app.post("/queue/run-all", dependencies=guard)
-    async def queue_run_all():
+    async def queue_run_all(request: Request):
         rows = await db.fetch_all(
             "SELECT id FROM accounts WHERE status != 'subscribed' AND card_id != '' AND totp_ref != ''"
             " ORDER BY created_at"
         )
         n = await queue.runner.submit_many([r["id"] for r in rows])
-        return _to(msg=f"{n} akun masuk antrean")
+        return _to(msg=i18n.t("msg.queued", i18n.resolve(request), n=n))
 
     @app.post("/queue/run", dependencies=guard)
-    async def queue_run_selected(ids: str = Form(default="")):
+    async def queue_run_selected(request: Request, ids: str = Form(default="")):
         wanted = [x.strip() for x in ids.split(",") if x.strip()]
         n = await queue.runner.submit_many(wanted)
-        return _to(msg=f"{n} akun masuk antrean")
+        return _to(msg=i18n.t("msg.queued", i18n.resolve(request), n=n))
 
     @app.post("/queue/stop", dependencies=guard)
-    async def queue_stop():
+    async def queue_stop(request: Request):
         await queue.runner.stop()
-        return _to(msg="stop dikirim")
+        return _to(msg=i18n.t("msg.stop_sent", i18n.resolve(request)))
 
     @app.get("/api/queue", dependencies=guard)
     async def api_queue() -> JSONResponse:

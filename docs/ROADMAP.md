@@ -1,63 +1,68 @@
-# Roadmap — handler & UI
+# Roadmap — handlers and UI
 
-Disusun dari kenyataan kode hari ini, bukan daftar keinginan umum. Kolom "butuh"
-menyebut bagian yang sudah ada supaya pekerjaannya jelas.
+Grounded in what the code actually has, not a wish list. "Needs" points at the
+part that already exists so the work is obvious.
 
-## Sudah dikerjakan (2026-11-08)
+## Done (2026-11-08 → 09)
 
-- **Riwayat run per akun** — `runs.py` mengisi tabel `runs`/`artifacts`; dialog
-  *log* menampilkan 5 run terakhir (waktu, status, egress, ringkasan gagal,
-  jumlah screenshot) dan bisa membaca log run mana pun.
-- **Baca log run lama** — `GET /api/log/{acc_id}?run=` dengan validasi path ada di
-  dalam `artifacts/`.
-- **Stepper 8 langkah** per akun di kolom status.
-- **Cari email + filter status** di atas tabel akun.
-- **Aksi massal** — centang baris → `POST /queue/run` (`ids`).
-- **Kolom "berakhir"** dari `accounts.expiry_date`, diisi saat discovery dan
-  setelah cancel terverifikasi.
+- **Run history per account** — `app/runs.py` fills the `runs`/`artifacts` tables;
+  the *log* button opens the last five runs (time, status, egress, failure reason,
+  screenshot count) and can read any of their logs.
+- **Read an older log** — `GET /api/log/{acc}?run=`, path validated against
+  `artifacts/`.
+- **Eight-step indicator** next to the status pill.
+- **Search + status filter** above the accounts table.
+- **Bulk actions** — tick rows → `POST /queue/run` (`ids`).
+- **"ends" column** from `accounts.expiry_date`, filled by discovery and after a
+  verified cancel.
+- **Localized UI** — English by default, Indonesian on request (`app/i18n.py`,
+  `/lang/{code}`, `help.en.html` / `help.id.html`).
+- **Token-free local access** — loopback `Host` required, cookie issued on `GET`,
+  `POST` still needs that cookie, token only for `GAI_ALLOW_REMOTE=1`.
 
-## 1. Ringan, nilai besar (bisa dikerjakan tanpa mengubah alur)
+## 1. Small, high value
 
-| # | Item | Kenapa | Butuh |
+| # | Item | Why | Needs |
 |---|---|---|---|
-| 1 | **Unduh / salin log** — tombol di dialog riwayat | "lihat log" sudah ada; tinggal simpan ke file | `GET /api/log?run=` (ada) + tombol `download` |
-| 2 | **Hapus riwayat lama** (mis. run > 30 hari) | `runs`/`artifacts` tumbuh terus | `DELETE /api/runs/{id}` + pembersihan file |
-| 3 | **Sorot baris yang sedang jalan** dengan animasi halus | Status `running` sudah ada, tapi tidak menonjol | `tr.running` di CSS |
+| 1 | **Download / copy a log** — button in the history dialog | *show log* exists; saving it does not | `GET /api/log?run=` (done) + a `download` button |
+| 2 | **Prune old history** (e.g. runs older than 30 days) | `runs`/`artifacts` only grow | `DELETE /api/runs/{id}` + file cleanup |
+| 3 | **Subtle motion on the running row** | `running` exists but does not stand out | `tr.running` in CSS |
+| 4 | **Remaining-time countdown on `ends`** | "2028-11-08" is less useful than "2 years, 1 month" | derived in JS, data already sent |
 
-## 2. Handler baru
+## 2. New handlers
 
-| # | Handler | Perilaku | Catatan |
+| # | Handler | Behaviour | Note |
 |---|---|---|---|
-| 4 | `resume` eksplisit | Tombol "lanjut dari langkah N" di UI | `subscribe_flow.py` sudah menerima `--from`; tinggal diteruskan dari `queue._run` |
-| 5 | `recovery` | Isi email pemulihan / lewati prompt kalau diminta | `login.pass_screens()` sudah punya cabang `SKIP_SEL` |
-| 6 | `card verify` | Setelah `cancel`, cek kartu benar-benar hilang dari akun dan catat hasilnya (bukan cuma log) | `detach_on_google()` sudah mengembalikan bool — simpan ke DB |
-| 7 | `retry policy` | Maks 2 percobaan per handler + jeda naik, bukan ulang seluruh alur | bungkus pemanggilan handler di `run_layers()` |
-| 8 | `expiry cache` | Sebelum run, baca `expiry_date` dari DB; kalau sudah 24 bulan, langsung cancel | menghindari run 3 layer yang pasti ditolak |
-| 9 | `preflight` | Cek: kartu aktif ada, profil Chrome bisa dibuka, egress US, akun belum `subscribed` | gagal cepat dengan pesan jelas, bukan di tengah checkout |
+| 5 | explicit `resume` | "continue from step N" button in the UI | `subscribe_flow.py` already takes `--from`; pass it from `queue._run` |
+| 6 | `recovery` | fill/confirm the recovery email when Google asks | `login.pass_screens()` already has the `SKIP_SEL` branch |
+| 7 | `card verify` | after `cancel`, confirm the card is really gone and record the result | `detach_on_google()` already returns a bool — store it |
+| 8 | `retry policy` | two attempts per handler with backoff, not a full re-run | wrap the handler calls in `run_layers()` |
+| 9 | `expiry cache` | read `expiry_date` first; at 24 months go straight to cancel | avoids a run that can only be rejected |
+| 10 | `preflight` | card active, profile opens, egress US, account not already `subscribed` | fail fast with a clear message instead of mid-checkout |
 
 ## 3. Observability
 
-| # | Item | Kenapa |
+| # | Item | Why |
 |---|---|---|
-| 10 | Durasi per handler + tingkat keberhasilan di header | Tahu apakah masalahnya sistematis atau per akun |
-| 11 | Notifikasi lokal saat run selesai/gagal (macOS `osascript`, Windows toast) | Run panjang; user tidak perlu menatap tab |
-| 12 | Export CSV (email, status, tanggal akhir, exit code) | Rekap stok akun |
-| 13 | Agregasi `runs` di header (mis. 7 hari terakhir: 4 sukses / 3 gagal) | `runs` sekarang terisi; tinggal di-query |
+| 11 | Per-handler duration and success rate in the header | tells a systemic problem from a single bad account |
+| 12 | Local notification when a run finishes or fails (macOS `osascript`, Windows toast) | runs are long; nobody wants to watch the tab |
+| 13 | CSV export (email, status, end date, exit code) | stocktaking |
+| 14 | Aggregate `runs` in the header (e.g. last 7 days: 4 ok / 3 failed) | `runs` is populated now, it just needs a query |
 
-## 4. Keamanan & operasional
+## 4. Security and operations
 
-| # | Item | Kenapa |
+| # | Item | Why |
 |---|---|---|
-| 14 | Enkripsi opsional `secrets.json` (passphrase → kunci turunan) | Kalau file ikut tersalin ke backup/sinkronisasi |
-| 15 | Deteksi instance ganda (lock file di data dir) | Dua konsol bisa menjalankan akun yang sama bersamaan |
-| 16 | Rotasi/segarkan `console.token` dari UI | Token sekarang hanya di file + log boot |
-| 17 | CI: `ruff` + `tests/selftest.py` di GitHub Actions | Refactor UI/handler gampang merusak hal kecil |
-| 18 | Hapus profil Chrome akun `subscribed` (opsional, manual) | Profil menyimpan cookie login; mengurangi jejak di disk |
+| 15 | Optional encryption of `secrets.json` (passphrase-derived key) | the file may end up in a backup or sync folder |
+| 16 | Single-instance detection (lock file in the data dir) | two consoles could run the same account at once |
+| 17 | Rotate `console.token` from the UI | it currently only changes on disk/boot |
+| 18 | CI: `ruff` + `tests/selftest.py` on GitHub Actions | UI/handler refactors are easy to break quietly |
+| 19 | Optional cleanup of Chrome profiles for `subscribed` accounts | profiles keep login cookies on disk |
 
-## Yang sengaja **tidak** dikerjakan
+## Deliberately not doing
 
-- Login paralel. Login Google serentak dari satu egress mempercepat turunnya
-  reputasi IP; antrean serial dipertahankan.
-- Menyimpan nomor kartu utuh di DB. `secrets.json` / referensi di DB sudah cukup
-  dan menjaga `/api` tidak pernah mengembalikan PAN.
-- Bypass captcha. Titik itu tetap diserahkan ke manusia di jendela Chrome.
+- Parallel logins. Several Google logins at once from one egress burn IP reputation
+  faster; the serial queue stays.
+- Storing full card numbers in the database. `secrets.json` plus refs is enough and
+  keeps `/api` from ever returning a PAN.
+- Captcha bypass. That stays with the human in the Chrome window.

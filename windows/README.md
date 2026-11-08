@@ -5,29 +5,31 @@ cd windows
 powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
-Yang dilakukan skrip ini:
+What the script does:
 
-1. `Set-Location` ke akar project (semua kode ada di `app/`, `tasks/`, `tests/`).
-2. Mencari Python 3.12+ (`py -3.13`, lalu `py -3`, lalu `python`).
-3. Membuat `.venv` bila belum ada, lalu `pip install -r requirements.txt`.
-4. Menjalankan console di `127.0.0.1:8765` (ubah dengan `$env:PORT=9000`).
+1. `Set-Location` to the project root (all code lives in `app/`, `tasks/`, `tests/`).
+2. Looks for Python 3.12+ (`py -3.13`, then `py -3`, then `python`).
+3. Creates `.venv` if missing, then `pip install -r requirements.txt`.
+4. Serves the console on `127.0.0.1:8765` (change with `$env:PORT=9000`).
 
-Prasyarat: **Google Chrome** terpasang (Playwright memakai `channel="chrome"`,
-jadi unduhan browser Playwright tidak diperlukan) dan egress **US**.
-Buka `http://127.0.0.1:8765/` — tidak perlu token. Token hanya wajib kalau
-console dibuka ke jaringan (`$env:GAI_ALLOW_REMOTE=1`).
+Then just open <http://127.0.0.1:8765/> — no token needed on the same machine.
 
-Data dir di Windows: `%LOCALAPPDATA%\GoogleAIAutomation`
+Requirements: **Google Chrome** installed (Playwright uses `channel="chrome"`, so
+no extra browser download), and US egress.
+
+Data dir on Windows: `%LOCALAPPDATA%\GoogleAIAutomation`
 
 ```
-db.sqlite3        metadata akun/kartu
-secrets.json      password, seed TOTP, nomor kartu, CVC (izin file 0600)
-console.token     token console (hanya dipakai untuk akses dari luar loopback)
-profiles\         profil Chrome per akun
-artifacts\        log run + screenshot
+db.sqlite3        account/card metadata
+secrets.json      passwords, TOTP secrets, card numbers, CVC (file mode 0600)
+console.token     access token (only for access from outside loopback)
+profiles\         one Chrome profile per account
+artifacts\        run logs and screenshots
 ```
 
-Kalau Python belum ada: pasang dari python.org dan centang *Add python.exe to PATH*.
+If Python is missing: install it from python.org and tick *Add python.exe to PATH*.
 
-Catatan: `requirements.lock` (hash-pinned) dibuat di macOS; di Windows versi
-tanpa hash dipakai karena wheel-nya beda platform.
+Note: `requirements.lock` is hash-pinned and built on macOS, so Windows uses the
+unpinned list instead — the wheels differ per platform.
+
+Full documentation: [../README.md](../README.md) · [../README.id.md](../README.id.md)

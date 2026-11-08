@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     require_token: bool = False
     allow_remote: bool = False
 
+    # Bahasa UI default (`en` / `id`). Bisa diganti per browser lewat tombol EN/ID
+    # di header; cookie `gai_lang` menang atas nilai ini.
+    language: str = "en"
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "db.sqlite3"

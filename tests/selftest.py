@@ -62,6 +62,42 @@ def test_security_policy() -> None:
     assert not security.token_matches(None, "abc")
 
 
+def test_i18n_coverage() -> None:
+    """Dua bahasa harus punya kunci yang sama, dan template tidak boleh memakai
+    kunci yang tidak ada (kalau tidak, UI diam-diam menampilkan nama kunci)."""
+    import re
+
+    from app import i18n
+
+    en, ind = set(i18n.TEXTS["en"]), set(i18n.TEXTS["id"])
+    assert en == ind, (sorted(en - ind), sorted(ind - en))
+
+    root = Path(__file__).resolve().parent.parent / "app" / "templates"
+    used: set[str] = set()
+    for path in root.glob("*.html"):
+        text = path.read_text(encoding="utf-8")
+        used |= set(re.findall(r"(?<![A-Za-z0-9_])t\(['\"]([a-zA-Z0-9_.]+)['\"]", text))
+    assert used, "tidak ada pemakaian t('…') yang terdeteksi di template"
+    missing = sorted(k for k in used if k not in en)
+    assert not missing, f"kunci tidak ada di i18n: {missing}"
+
+    for lang in i18n.LANGS:
+        assert set(i18n.js_strings(lang)) <= set(i18n.TEXTS[lang]), lang
+
+    # Kunci yang dipakai langsung oleh JS harus ikut dalam bundel i18n.
+    bundle = set(i18n.js_strings("en"))
+    for path in root.glob("*.html"):
+        text = path.read_text(encoding="utf-8")
+        for key in re.findall(r'I18N\["([a-z0-9_.]+)"\]', text):
+            assert key in bundle, f"{path.name}: I18N[{key!r}] tidak dikirim ke JS"
+
+    assert i18n.t("msg.queued", "en", n=3) == "3 accounts queued"
+    assert i18n.t("msg.queued", "id", n=3) == "3 akun masuk antrean"
+    assert i18n.t("msg.queued", "en") == "{n} accounts queued"      # tanpa parameter
+    assert i18n.t("tidak.ada", "id") == "tidak.ada"
+    assert i18n.resolve(None) in i18n.LANGS
+
+
 def test_totp_rfc_vectors() -> None:
     cases = {59: "287082", 1111111109: "081804", 1234567890: "005924", 2000000000: "279037"}
     for at, expected in cases.items():
