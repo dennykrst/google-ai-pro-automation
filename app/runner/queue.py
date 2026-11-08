@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from .. import db
+from .. import db, runs
 from ..config import settings
 
 BASE = Path(__file__).resolve().parents[2]
@@ -103,7 +103,12 @@ class Runner:
             except OSError:
                 pass
 
-        log_path = settings.artifacts_dir / f"run_{acc_id}_{int(time.time())}.log"
+        started = int(time.time())
+        log_path = settings.artifacts_dir / f"run_{acc_id}_{started}.log"
+        # Riwayat dicatat di DB, bukan hanya dari nama file: UI perlu status,
+        # durasi, egress, dan ringkasan penyebab gagal per run.
+        run_id = await runs.start(acc_id, start)
+        await runs.add_artifact(run_id, "log", log_path)
         with open(log_path, "wb") as fh:
             self.proc = await asyncio.create_subprocess_exec(
                 sys.executable, str(SCRIPT), email, "--from", str(start),
@@ -120,6 +125,8 @@ class Runner:
         else:
             status = "failed"
         await db.execute("UPDATE accounts SET status = ? WHERE id = ?", (status, acc_id))
+        await runs.finish(run_id, status, log_path)
+        await runs.add_shots(run_id, started)
         self.current = None
         self.last = acc_id
         self.last_status = status

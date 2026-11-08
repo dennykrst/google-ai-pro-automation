@@ -185,6 +185,25 @@
 </section>
 
 <section>
+  <h2>Panel akun</h2>
+  <ul>
+    <li><strong>cari email / filter status</strong> — menyaring baris yang tampil,
+        tanpa menyentuh data. Filter tetap aktif saat status akun berubah.</li>
+    <li><strong>jalankan terpilih</strong> — centang beberapa baris (atau centang
+        header untuk semua), lalu jalankan sekaligus. Masuk antrean serial yang
+        sama dengan <em>jalankan semua</em>.</li>
+    <li><strong>log</strong> (per baris) — riwayat 5 run terakhir untuk akun itu:
+        waktu mulai, status, egress, ringkasan penyebab gagal, jumlah screenshot,
+        dan tombol <em>lihat log</em> untuk membaca run mana pun. Riwayat disimpan
+        di tabel <code>runs</code>/<code>artifacts</code>, bukan cuma nama file.</li>
+    <li><strong>berakhir</strong> — tanggal akhir langganan yang terbaca saat
+        discovery atau cancel. <code>—</code> berarti belum pernah terbaca.</li>
+    <li><strong>8 titik</strong> di kolom status — langkah handler 1–8; titik hijau
+        adalah langkah terakhir yang dikerjakan.</li>
+  </ul>
+</section>
+
+<section>
   <h2>Yang butuh tangan manusia</h2>
   <ul>
     <li><strong>Device prompt saat login</strong> — Google minta konfirmasi di HP.

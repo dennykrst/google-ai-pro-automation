@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from urllib.parse import quote
 
-from . import db, vault
+from . import db, runs, vault
 from .config import settings
 from .runner import queue
 from .security import COOKIE_NAME, require_token
@@ -159,6 +159,12 @@ def create_app() -> FastAPI:
         n = await queue.runner.submit_many([r["id"] for r in rows])
         return _to(msg=f"{n} akun masuk antrean")
 
+    @app.post("/queue/run", dependencies=guard)
+    async def queue_run_selected(ids: str = Form(default="")):
+        wanted = [x.strip() for x in ids.split(",") if x.strip()]
+        n = await queue.runner.submit_many(wanted)
+        return _to(msg=f"{n} akun masuk antrean")
+
     @app.post("/queue/stop", dependencies=guard)
     async def queue_stop():
         await queue.runner.stop()
@@ -169,10 +175,16 @@ def create_app() -> FastAPI:
         return JSONResponse({"current": queue.runner.current, "pending": queue.runner.pending})
 
     @app.get("/api/log/{acc_id}", dependencies=guard)
-    async def api_log(acc_id: str) -> JSONResponse:
-        path = queue.latest_log(acc_id)
+    async def api_log(acc_id: str, run: str = "") -> JSONResponse:
+        """Log run tertentu (`?run=`) atau log terakhir akun itu."""
+        path = await runs.log_path(run) if run else None
+        path = path or queue.latest_log(acc_id)
         log = queue.tail(path) if path else ""
-        return JSONResponse({"log": log, "size": len(log)})
+        return JSONResponse({"log": log, "size": len(log), "file": path.name if path else ""})
+
+    @app.get("/api/runs/{acc_id}", dependencies=guard)
+    async def api_runs(acc_id: str) -> JSONResponse:
+        return JSONResponse({"runs": await runs.list_for_account(acc_id, limit=5)})
 
     @app.get("/api/state", dependencies=guard)
     async def api_state() -> JSONResponse:
@@ -182,7 +194,9 @@ def create_app() -> FastAPI:
         costs one round trip and every panel is guaranteed to be from the same
         snapshot.
         """
-        rows = await db.fetch_all("SELECT id, email, totp_ref, status, step, step_message FROM accounts")
+        rows = await db.fetch_all(
+            "SELECT id, email, totp_ref, status, step, step_message, expiry_date FROM accounts"
+        )
         codes: dict[str, dict[str, object]] = {}
         for row in rows:
             if row["totp_ref"]:
@@ -223,7 +237,8 @@ def create_app() -> FastAPI:
             "current": current,
             "pending": queue.runner.pending,
             "accounts": {
-                r["id"]: {"status": r["status"], "step": r["step"], "message": r["step_message"]}
+                r["id"]: {"status": r["status"], "step": r["step"], "message": r["step_message"],
+                          "expiry": r["expiry_date"]}
                 for r in rows
             },
             "log": log,

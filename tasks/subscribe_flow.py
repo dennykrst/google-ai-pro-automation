@@ -552,6 +552,11 @@ async def run_layers(page: Page, email: str, acc_id: str, layers: list[int], dry
     """
     end = await current_end_date(page)
     have = discover.months_from(discover.today(), end) if end else 0
+    if end:
+        # Disimpan supaya UI bisa menampilkan "berakhir" tanpa membuka browser,
+        # dan run berikutnya tahu sudah sampai mana tanpa discovery penuh.
+        await db.execute("UPDATE accounts SET expiry_date = ? WHERE id = ?",
+                         (end.isoformat(), acc_id))
     stage = discover.stage_for(have)
     say("DISC", f"term sekarang {end or 'tanpa langganan'} → {stage.label} ({have} bulan)")
     capped = False
@@ -828,31 +833,34 @@ async def release_card(page: Page, acc_id: str) -> None:
     say("KARTU", "penugasan dilepas di vault — kartu tetap tersimpan")
 
 
-async def cancel(page: Page) -> bool:
+async def cancel(page: Page) -> tuple[bool, str]:
+    """Cancel the plan and report (verified, end date as ISO)."""
     await nav.goto(page, PLAY)
     await asyncio.sleep(4)
     state = await body(page)
     if "Canceled" in state and "will end on" in state:
         say("CANCEL", "sudah Canceled — dilewati")
-        return True
+        hit = re.search(r"will end on ([A-Z][a-z]{2} \d{1,2}, \d{4})", state)
+        end = parse_date(hit.group(1)) if hit else None
+        return True, end.isoformat() if end else ""
     try:
         await page.locator('button:has-text("Manage")').first.click(timeout=10000)
     except Exception:
         say("CANCEL", "tombol Manage tidak ada")
-        return False
+        return False, ""
     await asyncio.sleep(4)
     try:
         await page.locator('button:has-text("Cancel subscription")').first.click(timeout=10000)
     except Exception:
         say("CANCEL", "tombol Cancel subscription tidak ada")
-        return False
+        return False, ""
     await asyncio.sleep(3)
 
     dialog = await body(page)
     m = re.search(r"canceled at the end of your billing period on ([A-Z][a-z]{2} \d{1,2}, \d{4})", dialog)
     if not m:
         say("CANCEL", "dialog tidak menyebut tanggal — tidak dikonfirmasi")
-        return False
+        return False, ""
     say("CANCEL", f"berakhir {m.group(1)} · konfirmasi")
     await page.locator('button:has-text("Cancel subscription")').last.click(timeout=10000)
     await asyncio.sleep(6)
@@ -861,7 +869,8 @@ async def cancel(page: Page) -> bool:
     ok = "Canceled" in after and "will end on" in after
     say("CANCEL", "terverifikasi: Canceled + tanggal berakhir" if ok
         else "status 'Canceled' belum terbaca")
-    return ok
+    end = parse_date(m.group(1))
+    return ok, end.isoformat() if end else ""
 
 
 async def main() -> int:
@@ -933,11 +942,12 @@ async def main() -> int:
             await ctx.close()
             return 0
 
-        done = await cancel(page)
+        done, ended = await cancel(page)
         if done:
             await release_card(page, acc_id)
-        await db.execute("UPDATE accounts SET status = ? WHERE email = ?",
-                         ("subscribed" if done else "failed", email))
+        await db.execute("UPDATE accounts SET status = ?, expiry_date = ? WHERE email = ?",
+                         ("subscribed" if done else "failed",
+                          ended or "", email))
         await page.screenshot(path=str(settings.artifacts_dir / f"flow_final_{int(time.time())}.png"))
         say("SELESAI", "cancel terverifikasi" if done else "cancel belum terverifikasi")
         await asyncio.sleep(10)

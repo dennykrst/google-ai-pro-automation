@@ -95,10 +95,10 @@
 
   /* ── layout ─────────────────────────────────────────────────────────── */
   main {
-    display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);
+    display:grid; grid-template-columns:minmax(0,1fr);
     gap:1rem; padding:1.1rem 1.4rem 0; align-items:start;
   }
-  @media (max-width:980px) { main { grid-template-columns:1fr; } }
+  @media (max-width:980px) { .tools input[type=search] { min-width:6rem; } }
   section {
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     box-shadow:var(--shadow); padding:1rem 1.05rem 1.05rem;
@@ -214,6 +214,43 @@
   .spin { display:inline-block; animation:spin 1s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  /* ── alat bantu tabel ──────────────────────────────────────────────── */
+  .tools { display:flex; gap:.45rem; align-items:center; margin:.55rem 0 .1rem; flex-wrap:wrap; }
+  .tools input[type=search] { flex:1; min-width:8rem; }
+  .tools select { padding:.42rem .5rem; }
+  td.pick, th.pick { padding-left:.3rem; padding-right:0; }
+  td.pick input { margin:0; }
+  td.exp { color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .steps { display:inline-flex; gap:2px; margin-left:.35rem; vertical-align:middle; }
+  .steps b { width:5px; height:5px; border-radius:50%; background:#d8dce4; display:block; }
+  .steps b.done { background:#9aa7bd; }
+  .steps b.cur { background:#15803d; box-shadow:0 0 0 2px rgba(21,128,61,.18); }
+  tr[hidden] { display:none !important; }
+
+  /* ── dialog riwayat ────────────────────────────────────────────────── */
+  dialog.runsdlg {
+    width:min(760px, 92vw); padding:0; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:0 24px 64px rgba(16,24,40,.22);
+  }
+  dialog.runsdlg::backdrop { background:rgba(16,24,40,.35); }
+  .dlghead { display:flex; align-items:center; gap:.5rem; padding:.75rem .9rem;
+             border-bottom:1px solid var(--line); }
+  .dlghead h2 { margin:0; font-size:11px; font-weight:650; letter-spacing:.08em;
+                text-transform:uppercase; color:var(--muted); }
+  .runslist { list-style:none; margin:0; padding:.3rem .55rem; max-height:250px; overflow:auto; }
+  .runslist li { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+                 padding:.45rem .3rem; border-bottom:1px solid var(--line-soft); font-size:12px; }
+  .runslist li:last-child { border-bottom:none; }
+  .runslist .when { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .runslist .runerr { flex:1 1 100%; color:var(--bad); font-size:11px; }
+  .runslist button { padding:.2rem .5rem; font-size:11px; }
+  dialog.runsdlg pre {
+    margin:0; padding:.7rem .9rem; max-height:44vh; overflow:auto;
+    border-top:1px solid var(--line); background:var(--log-bg); color:var(--log-fg);
+    font-size:11.5px; line-height:1.55; white-space:pre-wrap; word-break:break-word;
+  }
+
   @media (prefers-reduced-motion:reduce) {
     *, *::before, *::after { animation:none !important; transition:none !important; }
   }
@@ -265,18 +302,37 @@
       </div>
     </form>
 
+    <div class="tools">
+      <input type="search" id="fsearch" placeholder="cari email…" aria-label="cari akun" autocomplete="off">
+      <select id="fstatus" aria-label="filter status">
+        <option value="">semua status</option>
+        <option value="pending">pending</option>
+        <option value="running">running</option>
+        <option value="subscribed">subscribed</option>
+        <option value="failed">failed</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+      <button type="button" id="runsel" disabled>jalankan terpilih</button>
+    </div>
+
     <div class="scroll">
     <table>
       <colgroup>
-        <col style="width:22%"><col style="width:16%"><col style="width:13%">
-        <col style="width:12%"><col style="width:15%"><col style="width:22%">
+        <col style="width:3%"><col style="width:20%"><col style="width:12%"><col style="width:10%">
+        <col style="width:10%"><col style="width:11%"><col style="width:18%"><col style="width:16%">
       </colgroup>
       <thead>
-        <tr><th>email</th><th>password</th><th>otp</th><th>kartu</th><th>status</th><th></th></tr>
+        <tr>
+          <th class="pick"><input type="checkbox" id="pickall" aria-label="pilih semua akun"></th>
+          <th>email</th><th>password</th><th>otp</th><th>kartu</th>
+          <th>berakhir</th><th>status</th><th></th>
+        </tr>
       </thead>
       <tbody>
       {% for a in accounts %}
       <tr data-acc="{{ a.id }}" class="{{ a.status }}">
+        <td class="pick"><input type="checkbox" class="pickbox" value="{{ a.id }}"
+                                 aria-label="pilih {{ a.email }}"></td>
         <td class="email">{{ a.email }}</td>
         <td>
           <span class="pw">
@@ -297,11 +353,14 @@
           {% if a.card %}<span class="pill {{ a.card_status }}">{{ a.card }}</span>
           {% else %}<span class="muted">belum</span>{% endif %}
         </td>
+        <td class="exp" data-exp="{{ a.id }}">{{ a.expiry or '—' }}</td>
         <td>
-          <span class="pill" data-status="{{ a.id }}">{{ a.status }}</span>
-          {% if a.step %}<span class="muted" data-step="{{ a.id }}"> · {{ a.step }}</span>{% endif %}
+          <span class="pill {{ a.status }}" data-status="{{ a.id }}">{{ a.status }}</span>
+          <span class="steps" data-steps="{{ a.id }}" data-step="{{ a.step }}"
+                title="langkah {{ a.step }} dari 8">{% for i in range(1, 9) %}<b class="{% if i < a.step %}done{% elif i == a.step %}cur{% endif %}"></b>{% endfor %}</span>
         </td>
         <td class="actions">
+          <button type="button" data-runs="{{ a.id }}" title="riwayat run">log</button>
           <form method="post" action="/accounts/{{ a.id }}/run">
             <button type="submit" {% if a.status == 'running' or a.status == 'subscribed' %}disabled{% endif %}>jalankan</button>
           </form>
@@ -312,7 +371,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="empty">belum ada akun</td></tr>
+      <tr><td colspan="8" class="empty">belum ada akun</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -374,6 +433,17 @@
     </div>
   </section>
 </main>
+
+<dialog id="runsdlg" class="runsdlg">
+  <div class="dlghead">
+    <h2>Riwayat run</h2>
+    <span class="muted" id="runswho"></span>
+    <span class="spacer"></span>
+    <button type="button" id="runsx">tutup</button>
+  </div>
+  <ul id="runslist" class="runslist"><li class="muted">memuat…</li></ul>
+  <pre id="runslog" hidden></pre>
+</dialog>
 
 <section class="logwrap">
   <div class="loghead">
@@ -492,6 +562,18 @@
     logEl.replaceChildren(frag);
   }
 
+  function renderSteps(el, step) {
+    const frag = document.createDocumentFragment();
+    for (let i = 1; i <= 8; i++) {
+      const dot = document.createElement("b");
+      if (i < step) dot.className = "done";
+      else if (i === step) dot.className = "cur";
+      frag.append(dot);
+    }
+    el.replaceChildren(frag);
+    el.title = step ? `langkah ${step} dari 8` : "";
+  }
+
   function paintLog(data, running) {
     const text = data.log || "";
     const run = data.logRun || "";
@@ -562,13 +644,145 @@
           pill.textContent = v.status;
         }
       }
-      const step = by("data-step", id);
-      if (step) {
-        const want = v.step ? ` · ${v.step}` : "";
-        if (step.dataset.v !== want) { step.dataset.v = want; step.textContent = want; }
+      const steps = by("data-steps", id);
+      if (steps && steps.dataset.step !== String(v.step || 0)) {
+        steps.dataset.step = String(v.step || 0);
+        renderSteps(steps, Number(v.step) || 0);
       }
+      const exp = by("data-exp", id);
+      if (exp && exp.textContent !== (v.expiry || "—")) exp.textContent = v.expiry || "—";
     }
   }
+
+  /* ── filter, pilih massal, riwayat ─────────────────────────────────── */
+  const fsearch = $("#fsearch");
+  const fstatus = $("#fstatus");
+  const runselBtn = $("#runsel");
+  const pickAll = $("#pickall");
+  const runsDlg = $("#runsdlg");
+  let runsAcc = "";
+
+  function applyFilter() {
+    const q = (fsearch?.value || "").trim().toLowerCase();
+    const st = fstatus?.value || "";
+    for (const tr of document.querySelectorAll("tbody tr[data-acc]")) {
+      const email = (tr.querySelector("td.email")?.textContent || "").toLowerCase();
+      tr.hidden = Boolean((q && !email.includes(q)) || (st && tr.dataset.status !== st));
+    }
+  }
+
+  function picked() {
+    return [...document.querySelectorAll(".pickbox:checked")].map((b) => b.value);
+  }
+
+  function syncPick() {
+    if (!runselBtn) return;
+    const n = picked().length;
+    runselBtn.disabled = n === 0;
+    runselBtn.textContent = n ? `jalankan terpilih (${n})` : "jalankan terpilih";
+  }
+
+  fsearch?.addEventListener("input", applyFilter);
+  fstatus?.addEventListener("change", applyFilter);
+  document.addEventListener("change", (ev) => {
+    if (ev.target === pickAll) {
+      document.querySelectorAll(".pickbox").forEach((b) => { b.checked = pickAll.checked; });
+      syncPick();
+    } else if (ev.target.classList?.contains("pickbox")) {
+      syncPick();
+    }
+  });
+
+  runselBtn?.addEventListener("click", () => {
+    const ids = picked();
+    if (!ids.length) return;
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = "/queue/run";
+    const field = document.createElement("input");
+    field.type = "hidden";
+    field.name = "ids";
+    field.value = ids.join(",");
+    form.append(field);
+    document.body.append(form);
+    form.submit();
+  });
+
+  function line(...parts) {
+    const li = document.createElement("li");
+    for (const part of parts) if (part) li.append(part);
+    return li;
+  }
+
+  function span(text, cls) {
+    const el = document.createElement("span");
+    el.textContent = text;
+    if (cls) el.className = cls;
+    return el;
+  }
+
+  async function openRuns(acc) {
+    runsAcc = acc;
+    const tr = by("data-acc", acc);
+    $("#runswho").textContent = tr?.querySelector("td.email")?.textContent || acc;
+    const list = $("#runslist");
+    const pre = $("#runslog");
+    pre.hidden = true;
+    pre.textContent = "";
+    list.replaceChildren(line(span("memuat…", "muted")));
+    if (!runsDlg.open) runsDlg.showModal();
+
+    let runs = [];
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(acc)}`);
+      if (!res.ok) throw new Error(String(res.status));
+      runs = (await res.json()).runs || [];
+    } catch {
+      list.replaceChildren(line(span("gagal memuat riwayat", "runerr")));
+      return;
+    }
+    if (!runs.length) {
+      list.replaceChildren(line(span("belum ada run tercatat", "muted")));
+      return;
+    }
+    list.replaceChildren(...runs.map((r) => {
+      const li = line(
+        span(new Date(r.started_at * 1000).toLocaleString(), "when"),
+        span(r.status, `pill ${r.status}`),
+      );
+      if (r.egress) li.append(span(r.egress, "muted"));
+      if (r.log) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "lihat log";
+        btn.dataset.runlog = r.id;
+        li.append(btn);
+      }
+      if (r.shots?.length) li.append(span(`${r.shots.length} screenshot`, "muted"));
+      if (r.error) li.append(span(r.error, "runerr"));
+      return li;
+    }));
+  }
+
+  async function openRunLog(runId) {
+    const pre = $("#runslog");
+    pre.hidden = false;
+    pre.textContent = "memuat…";
+    try {
+      const res = await fetch(`/api/log/${encodeURIComponent(runsAcc)}?run=${encodeURIComponent(runId)}`);
+      pre.textContent = res.ok ? ((await res.json()).log || "(log kosong)") : "(gagal memuat log)";
+    } catch {
+      pre.textContent = "(gagal memuat log)";
+    }
+  }
+
+  document.addEventListener("click", (ev) => {
+    const hist = ev.target.closest("[data-runs]");
+    if (hist) { openRuns(hist.dataset.runs); return; }
+    const logBtn = ev.target.closest("[data-runlog]");
+    if (logBtn) { openRunLog(logBtn.dataset.runlog); return; }
+    if (ev.target.id === "runsx" || ev.target === runsDlg) runsDlg?.close();
+  });
 
   async function tick() {
     let data;
@@ -593,6 +807,7 @@
 
     paintCodes(data.codes);
     paintRows(data.accounts);
+    applyFilter();                                 // status bisa berubah, filter ikut
     paintLog(data, running);
 
     // Idle costs one request every 6s; a live run polls at 1s.

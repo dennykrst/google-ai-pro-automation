@@ -170,9 +170,16 @@ Arti kolom di tabel akun:
 | Kolom | Isi |
 |---|---|
 | `status` | `pending` → `running` → `subscribed` (cancel terverifikasi) / `failed` / `cancelled` / `dead` |
-| `· angka` | nomor handler terakhir yang dijalankan (lihat tabel handler di atas) |
+| titik di sebelah status | 8 langkah handler; titik hijau = langkah terakhir |
+| `berakhir` | tanggal akhir langganan dari discovery/cancel; `—` kalau belum pernah terbaca |
 | `otp` | kode TOTP yang sedang berlaku + bar sisa waktu |
 | `kartu` | brand + 4 digit terakhir; nomor utuh tidak pernah dikirim ke browser |
+
+Di atas tabel ada pencarian email, filter status, dan **jalankan terpilih**
+(centang baris, atau centang header untuk memilih semua). Tombol **log** di tiap
+baris membuka riwayat 5 run terakhir — waktu, status, egress, ringkasan penyebab
+gagal, jumlah screenshot, dan tombol untuk membaca log run mana pun. Riwayat ini
+disimpan di tabel `runs`/`artifacts`, jadi tetap ada setelah console di-restart.
 
 Panel log menampilkan run yang sedang jalan **dan** run terakhir setelah selesai;
 kalau run gagal, baris penyebabnya disorot dan diringkas di bawah panel, jadi log
@@ -199,6 +206,7 @@ app/                 inti bersama (dipakai kedua OS)
   main.py            rute halaman + antrean + /help
   config.py          settings, data dir per platform, token console
   db.py              skema SQLite + migrasi idempoten
+  runs.py            riwayat run + artifact (log, screenshot) untuk UI
   vault.py           akun & kartu (nilai di secrets.json)
   secrets.py         penyimpanan secret lokal (JSON 0600, tanpa API OS)
   totp.py            TOTP stdlib

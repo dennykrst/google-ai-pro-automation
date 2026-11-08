@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 _TMP = Path(tempfile.mkdtemp(prefix="gai-selftest-"))
 os.environ["GAI_DATA_DIR"] = str(_TMP)
 
-from app import db, secrets, totp  # noqa: E402
+from app import db, runs, secrets, totp, vault  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.models import AccountCreate  # noqa: E402
 
 # RFC 6238 Appendix B: secret "12345678901234567890" (ASCII), SHA-1, 8 digits.
@@ -56,6 +57,64 @@ def test_secrets_roundtrip() -> None:
     assert secrets.get(ref) == "overwritten"
     secrets.delete(ref)
     assert secrets.get(ref) == ""
+
+
+def test_runs_history() -> None:
+    """Setiap run dicatat: status, ringkasan penyebab gagal, egress, dan path log."""
+
+    async def run() -> None:
+        await db.migrate()
+        await vault.add_account("runs.test@gmail.com", "pw", "")
+        acc = (await db.fetch_all(
+            "SELECT id FROM accounts WHERE email = ?", ("runs.test@gmail.com",)))[0]["id"]
+
+        log = settings.artifacts_dir / "run_acc_fixture01_1700000000.log"
+        log.write_text(
+            "akun runs.test@gmail.com · acc\n"
+            "[10:00:01] EGRESS 1.2.3.4 · US · Example Org\n"
+            "[10:00:05] KARTU  kolom CVC meleset — ulang\n"
+            "[10:00:06] KARTU  kartu gagal tersimpan\n"
+            "[10:00:06] STOP   layer belum tuntas\n",
+            encoding="utf-8",
+        )
+
+        run_id = await runs.start(acc, 1)
+        await runs.add_artifact(run_id, "log", log)
+        await runs.finish(run_id, "failed", log)
+
+        rows = await runs.list_for_account(acc)
+        assert rows and rows[0]["status"] == "failed", rows
+        assert rows[0]["error"].endswith("layer belum tuntas"), rows[0]["error"]
+        assert rows[0]["egress"] == "1.2.3.4 · US", rows[0]["egress"]
+        assert rows[0]["log"].endswith("run_acc_fixture01_1700000000.log")
+        assert rows[0]["ended_at"] >= rows[0]["started_at"]
+
+        found = await runs.log_path(run_id)
+        assert found is not None and found.exists(), found
+
+        # Path di luar artifacts/ harus ditolak, meskipun tercatat di DB.
+        escape = await runs.start(acc, 1)
+        await runs.add_artifact(escape, "log", "/etc/hosts")
+        assert await runs.log_path(escape) is None
+
+    asyncio.run(run())
+
+
+def test_newest_log_parsing() -> None:
+    """Nama file run dipakai untuk memulihkan acc_id setelah console restart."""
+    from app.runner import queue
+
+    path = settings.artifacts_dir / "run_acc_fixture01_1700000000.log"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text("[10:00:06] STOP layer belum tuntas\n", encoding="utf-8")
+
+    found = queue.newest_log()
+    assert found is not None, "log fixture tidak terbaca"
+    acc_id, newest = found
+    assert acc_id == "acc_fixture01", acc_id
+    assert newest.name == "run_acc_fixture01_1700000000.log", newest.name
+    assert "STOP" in queue.tail(newest)
 
 
 def test_db_migrate() -> None:

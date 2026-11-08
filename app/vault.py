@@ -276,6 +276,7 @@ async def accounts_view() -> list[dict[str, Any]]:
             "status": row["status"],
             "step": row["step"],
             "message": row["step_message"],
+            "expiry": row["expiry_date"],
         })
     return out
 
