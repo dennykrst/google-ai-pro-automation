@@ -253,21 +253,217 @@ async def commit(page: Page) -> bool:
     return True
 
 
-async def click_any_frame(page: Page, selectors: list[str]) -> bool:
-    """Click inside whichever frame holds the control. Card entry lives in the
-    instrumentmanager frame, not the eacquire one."""
-    for f in page.frames:
-        for sel in selectors:
+ADD_CARD_SELS = ['button:has-text("Add card")', 'text="Add card"',
+                 '[role="button"]:has-text("Add card")']
+SAVE_CARD_SELS = ['button:has-text("Save card")', 'button:has-text("Save")',
+                  'text=/^Save$/']
+
+# Petunjuk atribut tiap kolom. Dicocokkan ke autocomplete/name/id/aria-label/
+# placeholder: index saja tidak cukup, jumlah node bergeser dan Google kadang
+# memecah kedaluwarsa jadi dua kolom (bulan dan tahun).
+CARD_HINTS = {
+    "number": ("cc-number", "cardnumber", "card_number", "card number"),
+    "exp": ("cc-exp", "expir", "expdate", "exp-date", "exp_month",
+            "exp-month", "exp-year", "expmonth", "expyear", "exp_year"),
+    "cvc": ("cc-csc", "cvc", "csc", "security code", "securitycode"),
+    "name": ("cc-name", "holder", "cardname", "name on card"),
+    "zip": ("postal", "zip"),
+}
+
+
+async def card_form_frame(page: Page, seconds: float = 25.0):
+    """The frame holding the card form (instrumentmanager), re-resolved fresh."""
+    for _ in range(int(seconds / 0.5)):
+        for f in page.frames:
             try:
-                loc = f.locator(sel)
-                for i in range(await loc.count()):
-                    el = loc.nth(i)
-                    if await el.is_visible():
-                        await el.click(timeout=6000)
-                        return True
+                if await f.locator("input:visible").count() >= 3:
+                    return f
             except Exception:
                 continue
+        await asyncio.sleep(0.5)
+    return None
+
+
+async def card_fields(frame, role: str) -> list:
+    """Visible inputs whose attributes point at this role, in DOM order."""
+    out = []
+    try:
+        loc = frame.locator("input:visible")
+        total = await loc.count()
+    except Exception:
+        return out
+    for i in range(total):
+        el = loc.nth(i)
+        try:
+            attrs = await el.evaluate(
+                "el => [el.autocomplete, el.name, el.id, el.getAttribute('aria-label') || '',"
+                " el.placeholder || ''].join(' ').toLowerCase()")
+        except Exception:
+            continue
+        if any(hint in attrs for hint in CARD_HINTS[role]):
+            out.append(el)
+    return out
+
+
+async def card_field(frame, role: str, index: int | None = None):
+    """One card input: attribute match first, positional index only as fallback."""
+    found = await card_fields(frame, role)
+    if found:
+        return found[0]
+    if index is None:
+        return None
+    try:
+        el = frame.locator("input:visible").nth(index)
+        return el if await el.count() else None
+    except Exception:
+        return None
+
+
+async def card_report(frame) -> str:
+    """Form summary for the log: field handle + value *length*, never the value."""
+    try:
+        return await frame.evaluate(
+            "() => [...document.querySelectorAll('input')]"
+            ".filter(el => el.offsetWidth || el.offsetHeight)"
+            ".map((el, i) => `${i}:${el.autocomplete || el.name || el.id || el.type || '?'}`"
+            " + `=${(el.value || '').length}`).join(' ')")
+    except Exception:
+        return "tidak terbaca"
+
+
+async def fill_card_fields(frame, number: str, exp: str, cvc: str) -> bool:
+    """Fill number, expiry, CVC, then holder and ZIP when the form offers them.
+
+    Typed, not filled: Google reformats the number while it is being typed.
+    """
+    el = await card_field(frame, "number", 0)
+    if el is None:
+        say("KARTU", "kolom nomor tidak ada di form")
+        return False
+    if not await type_field(el, number, "nomor"):
+        return False
+
+    exps = await card_fields(frame, "exp")
+    if not exps:
+        fallback = await card_field(frame, "exp", 1)
+        exps = [fallback] if fallback is not None else []
+    if not exps:
+        say("KARTU", "kolom kedaluwarsa tidak ada di form")
+        return False
+    if len(exps) >= 2:                            # bulan dan tahun terpisah
+        if not await type_field(exps[0], exp[:2], "bulan"):
+            return False
+        if not await type_field(exps[1], exp[2:], "tahun"):
+            return False
+    elif not await type_field(exps[0], exp, "kedaluwarsa"):
+        return False
+
+    cvc_el = await card_field(frame, "cvc", 2)
+    if cvc_el is None:
+        say("KARTU", "kolom CVC tidak ada di form")
+        return False
+    if not await type_field(cvc_el, cvc, "CVC"):
+        return False
+
+    for role, value, digits in (("name", "CARD HOLDER", False), ("zip", "97201", True)):
+        el = await card_field(frame, role)
+        if el is None:
+            continue                              # kolom opsional: jangan tebak index
+        try:
+            if (await el.input_value()).strip():
+                continue
+        except Exception:
+            pass
+        await type_field(el, value, role, digits=digits)
+    say("KARTU", f"isi form: {await card_report(frame)}")
+    return True
+
+
+async def card_saved(page: Page, frame, seconds: float = 45.0) -> bool:
+    """Saved when the card form is gone and the checkout dialog is back."""
+    for _ in range(int(seconds / 1.5)):
+        await asyncio.sleep(1.5)
+        text = await frame_text(page)
+        if not text:
+            continue
+        try:
+            left = await frame.locator("input:visible").count()
+        except Exception:
+            left = 0
+        if left == 0 and "add payment method" not in text.lower():
+            say("KARTU", "kartu tersimpan, dialog kembali ke checkout")
+            return True
     return False
+
+
+async def clear_field(field) -> None:
+    """Empty a card input the way a human would: select, delete, and force the
+    value through the native setter for whatever Chrome already autofilled."""
+    try:
+        await field.click()
+        await field.press("ControlOrMeta+a")       # Meta di macOS, Control di Windows
+        await field.press("Backspace")
+    except Exception:
+        pass
+    try:
+        await field.evaluate(
+            "(el) => { const s = Object.getOwnPropertyDescriptor("
+            "HTMLInputElement.prototype, 'value').set; s.call(el, '');"
+            " el.dispatchEvent(new Event('input', {bubbles: true}));"
+            " el.dispatchEvent(new Event('change', {bubbles: true})); }")
+    except Exception:
+        pass
+
+
+async def type_field(field, value: str, label: str, *, digits: bool = True,
+                     tries: int = 3) -> bool:
+    """Type one value and prove it landed before moving to the next field.
+
+    Chrome's password manager drops the saved account password into whichever card
+    field is focused — that is how the CVC box ended up holding the keychain
+    password instead of three digits. So: focus by explicit click (never Tab),
+    dismiss any autofill popup with Escape, wipe the old content, type, then read
+    the value back. A field that does not hold what we typed is redone.
+    """
+    want = re.sub(r"\D", "", value) if digits else value.strip()
+    for attempt in range(tries):
+        await clear_field(field)
+        await asyncio.sleep(0.4)
+        try:
+            await field.press("Escape")           # tutup dropdown autofill
+            await asyncio.sleep(0.2)
+            if not await field.count():           # Escape ikut menutup dialog kartu
+                say("KARTU", f"dialog kartu tertutup saat mengisi {label}")
+                return False
+        except Exception:
+            pass
+        try:
+            await field.press_sequentially(value, delay=80 if len(value) > 6 else 55)
+        except Exception:
+            pass
+        await asyncio.sleep(0.6)
+        try:
+            got = await field.input_value()
+        except Exception:
+            got = ""
+        check = re.sub(r"\D", "", got) if digits else got.strip()
+        if check == want:
+            return True
+        # Isi tidak pernah dicetak: kalau autofill menang, nilainya password akun.
+        hint = " (sepertinya password ikut masuk)" if digits and re.search(r"[A-Za-z]", got) else ""
+        say("KARTU", f"kolom {label} meleset ({len(got)} char, harusnya {len(want)}){hint} — ulang")
+
+    try:                                          # upaya terakhir: isi langsung
+        await clear_field(field)
+        await field.evaluate(
+            "(el, v) => { const s = Object.getOwnPropertyDescriptor("
+            "HTMLInputElement.prototype, 'value').set; s.call(el, v);"
+            " el.dispatchEvent(new Event('input', {bubbles: true}));"
+            " el.dispatchEvent(new Event('change', {bubbles: true})); }", value)
+        return True
+    except Exception:
+        say("KARTU", f"kolom {label} tidak bisa diisi")
+        return False
 
 
 async def ensure_card(page: Page, acc_id: str) -> bool:
@@ -285,118 +481,65 @@ async def ensure_card(page: Page, acc_id: str) -> bool:
     number = vault.secret_get(card["number_ref"])
     cvc = vault.secret_get(card["cvc_ref"])
     if not number or not cvc:
-        say("KARTU", "nomor/CVC tidak terbaca dari Keychain")
+        say("KARTU", "nomor/CVC tidak terbaca dari penyimpanan lokal")
         return False
     exp = f"{card['exp_month']}{card['exp_year']}"
     say("KARTU", f"tempel {card['brand']}-{card['last4']} ke akun")
 
-    if not await click_any_frame(page, ['button:has-text("Add card")', 'text="Add card"',
-                                        '[role="button"]:has-text("Add card")']):
+    # "Add card" sering belum ter-render saat dialog baru terbuka, dan tombolnya
+    # ada di frame instrumentmanager — cari yang benar-benar bisa diklik.
+    add = await find_button(page, ADD_CARD_SELS, 25.0)
+    if add is None:
         say("KARTU", "tombol Add card tidak ditemukan")
         return False
-
-    # Tunggu modal benar-benar selesai digambar: jumlah kolom stabil dan tombol
-    # simpan sudah ada. Mengetik di modal setengah jadi membuat angka kartu hilang.
-    frame = None
-    prev = -1
-    ready = False
-    for _ in range(40):
-        await asyncio.sleep(0.5)
-        frame = None
-        for f in page.frames:
-            try:
-                n = await f.locator("input:visible").count()
-            except Exception:
-                continue
-            if n >= 3:
-                frame = f
-                break
-        if frame is None:
-            continue
-        n = await frame.locator("input:visible").count()
-        if n == prev and await frame.locator('button:has-text("Save card")').count():
-            ready = True
-            break
-        prev = n
-    if not ready or frame is None:
-        say("KARTU", "form kartu tidak siap")
+    try:
+        await add.click(timeout=8000)
+    except Exception as exc:
+        say("KARTU", f"klik Add card gagal: {type(exc).__name__}")
         return False
-    say("FRAME", f"form kartu di {frame.url[:70]}")
-    await asyncio.sleep(1.0)
 
-    inputs = frame.locator("input:visible")
-    values = [number, exp, cvc]
-    saved = False
+    frame = await card_form_frame(page)
+    if frame is None:
+        say("KARTU", "form kartu tidak muncul")
+        return False
+    # Beri waktu render selesai: mengetik di modal setengah jadi membuat angka
+    # kartu hilang dan tombol simpan tetap mati.
+    for _ in range(20):
+        await asyncio.sleep(0.5)
+        if await frame.locator('button:has-text("Save")').count():
+            break
+    say("FRAME", f"form kartu di {frame.url[:70]}")
+    await asyncio.sleep(2.0)
+
     for attempt in range(2):
         if attempt:
             say("KARTU", "form belum tuntas — isi ulang pelan")
             await asyncio.sleep(2.0)
-            frame = None
-            for f in page.frames:
-                try:
-                    if await f.locator("input:visible").count() >= 3:
-                        frame = f
-                        break
-                except Exception:
-                    continue
+            frame = await card_form_frame(page)
             if frame is None:
                 break
-            inputs = frame.locator("input:visible")
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(1.0)
 
-        for idx, value in enumerate(values):
-            field = inputs.nth(idx)
-            await field.click()
-            try:
-                if (await field.input_value()).strip():
-                    await field.press("Meta+a")
-                    await field.press("Backspace")
-            except Exception:
-                pass
-            await asyncio.sleep(0.4)
-            # Diketik, bukan fill: Google memformat ulang nomor sambil diketik.
-            await field.press_sequentially(value, delay=80 if idx == 0 else 55)
-            await asyncio.sleep(1.0 if idx == 0 else 0.5)
-        if await inputs.count() >= 5:
-            try:
-                if not (await inputs.nth(3).input_value()).strip():
-                    await inputs.nth(3).press_sequentially("CARD HOLDER", delay=40)
-                await inputs.nth(4).press_sequentially("97201", delay=40)
-            except Exception:
-                pass
-            await asyncio.sleep(0.8)
+        if not await fill_card_fields(frame, number, exp, cvc):
+            continue
 
-            save = 'button:has-text("Save card")'
-            for _ in range(12):                   # tunggu tombol simpan aktif
-                try:
-                    loc = frame.locator(save).first
-                    if not await loc.count():
-                        break
-                    if not await loc.is_disabled():
-                        break
-                except Exception:
-                    break
-                await asyncio.sleep(0.4)
+        # Jangan pernah menunggu jumlah kolom tertentu: form bisa punya 4 atau 5
+        # kolom, dan dulu `count >= 5` membuat kartu tidak pernah disimpan.
+        btn = await find_button(page, SAVE_CARD_SELS, 30.0)
+        if btn is None:
+            say("KARTU", "tombol Save card tidak pernah aktif")
+            continue
+        say("KARTU", "menyimpan kartu")
+        try:
+            await btn.click(timeout=8000)
+        except Exception as exc:
+            say("KARTU", f"klik Save card gagal: {type(exc).__name__}")
+            continue
 
-            say("KARTU", "data terisi, menyimpan")
-            if not await click_any_frame(page, ['button:has-text("Save card")',
-                                                'button:has-text("Save")', 'text=/^Save$/']):
-                say("KARTU", "tombol simpan tidak ditemukan")
-                continue
-
-            for _ in range(25):
-                await asyncio.sleep(1.5)
-                text = await frame_text(page)
-                if "add payment method" not in text.lower() and (
-                    "today" in text.lower() or "free trial" in text.lower()
-                ):
-                    say("KARTU", "kartu tersimpan, dialog kembali ke checkout")
-                    return True
-            saved = True
-        say("KARTU", "dialog tidak kembali setelah menyimpan" if saved
-            else "kartu gagal terisi")
-        return False
-    say("KARTU", "form kartu tidak muncul")
+        if await card_saved(page, frame):
+            return True
+        say("KARTU", f"form menolak kartu — isi sekarang: {await card_report(frame)}")
+    say("KARTU", "kartu gagal tersimpan")
     return False
 
 
@@ -744,7 +887,7 @@ async def main() -> int:
         return 2
     acc_id, password, secret = creds
     if not password:
-        print(f"password kosong di Keychain untuk {email} ({acc_id}) — impor ulang akunnya",
+        print(f"password kosong di vault untuk {email} ({acc_id}) — impor ulang akunnya",
               flush=True)
         return 2
     print(f"akun {email} · {acc_id} · password {len(password)} char"

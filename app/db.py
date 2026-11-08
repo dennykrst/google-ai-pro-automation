@@ -1,7 +1,8 @@
 """SQLite store. Schema migrations are idempotent and versioned.
 
-Secrets never land here: password, TOTP seed and card number/CVC are Keychain
-handles. Everything that is merely *about* an account is a column.
+Secrets never land here: password, TOTP seed and card number/CVC live in
+`secrets.json`, and this file only holds the refs. Everything that is merely
+*about* an account is a column.
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ CREATE TABLE IF NOT EXISTS artifacts (
     created_at INTEGER NOT NULL
 );
 
--- Single row. Card number and CVC are Keychain handles, not values.
+-- Single row. Card number and CVC are secret refs, not values.
 CREATE TABLE IF NOT EXISTS vault_card (
     id         INTEGER PRIMARY KEY CHECK (id = 1),
     exp_month  TEXT NOT NULL DEFAULT '',
@@ -70,8 +71,8 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_run ON artifacts(run_id);
 """
 
 # v2: cards as a rotating pool. The account line format is email|password|totp,
-# the card line format is number|MM/YY|cvc, so number and CVC live in Keychain
-# and only last4/expiry are columns.
+# the card line format is number|MM/YY|cvc, so number and CVC live in the secret
+# store and only last4/expiry are columns.
 _DDL_V2 = """
 CREATE TABLE IF NOT EXISTS cards (
     id           TEXT PRIMARY KEY,

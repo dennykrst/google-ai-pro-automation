@@ -1,0 +1,25 @@
+#!/bin/bash
+# Jalankan konsol di macOS. Aman diulang: pakai venv kalau ada, buat kalau belum.
+set -euo pipefail
+cd "$(dirname "$0")/.."          # akar project, tempat app/ dan requirements.lock
+
+PY=$(command -v python3.13 || true)
+if [ -z "$PY" ] && [ -x /opt/homebrew/bin/python3.13 ]; then PY=/opt/homebrew/bin/python3.13; fi
+if [ -z "$PY" ]; then
+  echo "python3.13 tidak ditemukan. Pasang dulu: brew install python@3.13" >&2
+  exit 1
+fi
+
+if [ ! -x .venv/bin/python ]; then
+  "$PY" -m venv .venv
+  .venv/bin/python -m pip install --upgrade pip >/dev/null
+  .venv/bin/python -m pip install --require-hashes -r requirements.lock
+fi
+
+export GAI_BIND_PORT="${PORT:-8765}"
+
+[ -d "/Applications/Google Chrome.app" ] \
+  || echo "peringatan: Google Chrome tidak ada di /Applications — login akan gagal" >&2
+
+exec .venv/bin/python -m uvicorn app.main:app \
+  --host 127.0.0.1 --port "$GAI_BIND_PORT" --log-level warning

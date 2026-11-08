@@ -45,7 +45,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="GaiConsole", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="Google AI Pro Automation", lifespan=lifespan,
+                  docs_url=None, redoc_url=None)
     guard = [Depends(require_token)]
 
     @app.get("/healthz")
@@ -68,6 +69,19 @@ def create_app() -> FastAPI:
         )
         if getattr(request.state, "set_cookie_token", None):
             resp.set_cookie(COOKIE_NAME, request.state.set_cookie_token, httponly=True, samesite="strict")
+        return resp
+
+    @app.get("/help", dependencies=guard)
+    async def help_page(request: Request):
+        """Panduan di dalam aplikasi: handler, format input, arti log, data dir."""
+        resp = templates.TemplateResponse(
+            request,
+            "help.html",
+            {"data_dir": str(settings.data_dir)},
+        )
+        if getattr(request.state, "set_cookie_token", None):
+            resp.set_cookie(COOKIE_NAME, request.state.set_cookie_token,
+                            httponly=True, samesite="strict")
         return resp
 
     @app.get("/api/codes", dependencies=guard)
@@ -177,12 +191,32 @@ def create_app() -> FastAPI:
                     codes[row["id"]] = {"code": vault.totp.code(seed), "left": vault.totp.seconds_left()}
 
         current = queue.runner.current
-        log, size = "", 0
+        # Setelah run berhenti (termasuk karena gagal) log-nya tetap disajikan.
+        # Dulu hanya `current` yang dibaca, jadi panel di browser dikosongkan tepat
+        # saat penyebab gagalnya baru muncul — tidak sempat dibaca siapa pun.
+        target = current or queue.runner.last
+        path = queue.latest_log(target) if target else None
+        if path is None:                  # console baru restart: pakai log terbaru
+            found = queue.newest_log()
+            if found:
+                target, path = found
+        log, size, run_file, email, status = "", 0, "", "", ""
+        if path:
+            log = queue.tail(path, lines=200)
+            size = len(log)
+            run_file = path.name
+        if target:
+            row = await db.fetch_one("SELECT email, status FROM accounts WHERE id = ?", (target,))
+            if row:
+                email, status = row["email"], row["status"]
         if current:
-            path = queue.latest_log(current)
-            if path:
-                log = queue.tail(path, lines=200)
-                size = len(log)
+            log_state = "running"
+        elif target and target == queue.runner.last:
+            log_state = queue.runner.last_status
+        elif status:
+            log_state = status
+        else:
+            log_state = "idle"
 
         return JSONResponse({
             "codes": codes,
@@ -194,6 +228,10 @@ def create_app() -> FastAPI:
             },
             "log": log,
             "logSize": size,
+            "logAcc": target or "",
+            "logEmail": email,
+            "logRun": run_file,
+            "logState": log_state,
         })
 
     return app

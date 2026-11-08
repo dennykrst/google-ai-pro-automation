@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Bantuan — Google AI Pro Automation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f3f4f7; --panel:#fff; --line:#e3e6eb; --line-soft:#eef0f4;
+    --ink:#12141a; --muted:#6b7280; --accent:#101318; --accent-hover:#23262d;
+    --ok:#15803d; --ok-bg:#e9f8ef;
+    --bad:#b42318; --bad-bg:#fdeceb; --bad-line:#f6ccc8;
+    --warn:#a15c07; --warn-bg:#fdf5e6; --warn-line:#f0e2bd;
+    --info:#1d4ed8; --info-bg:#e9effd;
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.04);
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{
+    margin:0; color:var(--ink); background:var(--bg);
+    font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  code{font:12px ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+       background:#f2f4f7; padding:.05rem .32rem; border-radius:4px}
+  header{
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.9rem;
+    flex-wrap:wrap; padding:.7rem 1.4rem; border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.8); backdrop-filter:saturate(180%) blur(14px);
+  }
+  .brand{display:flex; align-items:center; gap:.65rem}
+  .logo{width:26px;height:26px;border-radius:8px;flex:none;position:relative;
+        background:linear-gradient(140deg,#2f3a52,#101318 62%);
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+  .logo::after{content:"";position:absolute;inset:7px 6px;border-radius:3px;
+        border:1.5px solid rgba(255,255,255,.75);border-right-color:transparent;
+        border-bottom-color:transparent;transform:rotate(45deg)}
+  h1{font-size:14px;margin:0;font-weight:650}
+  .sub{font-size:11px;color:var(--muted);line-height:1.2}
+  .spacer{flex:1}
+  a.btn, button{
+    font:12px/1.4 inherit; font-weight:550; display:inline-block;
+    padding:.45rem .8rem; border:1px solid var(--line); border-radius:var(--radius-sm);
+    background:#fff; color:var(--ink); cursor:pointer; text-decoration:none;
+    box-shadow:0 1px 1px rgba(16,24,40,.04);
+  }
+  a.btn:hover, button:hover{background:#f6f7f9;border-color:#d5d9e1}
+  main{max-width:900px; margin:0 auto; padding:1.2rem 1.4rem 3rem;
+       display:flex; flex-direction:column; gap:1rem}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+          box-shadow:var(--shadow);padding:1rem 1.15rem 1.15rem}
+  h2{display:flex;align-items:center;gap:.5rem;margin:0 0 .6rem;font-size:11px;
+     font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  h2::before{content:"";width:3px;height:12px;border-radius:2px;background:#2f3a52}
+  .lead{margin:0 0 .8rem;font-size:13px;line-height:1.65}
+  p{margin:.45rem 0}
+  ul,ol{margin:.35rem 0 .35rem 1.1rem;padding:0}
+  li{margin:.25rem 0}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;margin-top:.4rem}
+  th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.07em;
+     text-transform:uppercase;color:var(--muted);background:#fbfcfd;
+     border-bottom:1px solid var(--line);padding:.5rem .55rem}
+  td{padding:.5rem .55rem;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{width:2.2rem;color:var(--muted);font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;font-size:10.5px;font-weight:600;padding:.12rem .5rem;
+        border-radius:999px;background:#f0f2f5;color:#5b6270}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}
+  .pill.bad{background:var(--bad-bg);color:var(--bad)}
+  .pill.info{background:var(--info-bg);color:var(--info)}
+  .note{background:var(--warn-bg);border:1px solid var(--warn-line);
+        border-radius:var(--radius-sm);padding:.6rem .75rem;font-size:12px;margin:.7rem 0 0}
+  .warn{background:var(--bad-bg);border:1px solid var(--bad-line);color:var(--bad);
+        border-radius:var(--radius-sm);padding:.6rem .75rem;font-size:12px;margin:.7rem 0 0}
+  footer{color:var(--muted);font-size:11.5px;text-align:center;padding-top:.5rem}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>Bantuan</h1>
+      <div class="sub">Google AI Pro Automation</div>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <a class="btn" href="/">kembali ke konsol</a>
+</header>
+
+<main>
+
+<section>
+  <h2>Alur per akun</h2>
+  <p class="lead">Satu akun dijalankan berurutan oleh satu proses terpisah. Setiap
+  langkah diperiksa dulu sebelum menekan tombol apa pun — kalau angka di layar tidak
+  sesuai harapan, alur berhenti daripada menagih sesuatu yang salah.</p>
+
+  <table>
+    <thead>
+      <tr><th class="num">#</th><th>Handler</th><th>Yang dilakukan</th><th>Guard sebelum lanjut</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">0</td>
+        <td><code>egress</code></td>
+        <td>Cek IP dan negara lewat <code>ipwho.is</code> di dalam browser.</td>
+        <td>Negara harus <strong>US</strong>; menunggu sampai 120 detik lalu berhenti.</td>
+      </tr>
+      <tr>
+        <td class="num">1</td>
+        <td><code>login</code></td>
+        <td>Email → password → TOTP, termasuk layar yang tidak bisa diprediksi
+            (captcha, prompt pemulihan, device prompt).</td>
+        <td>URL harus keluar dari <code>accounts.google.com</code>.</td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td><code>discover</code></td>
+        <td>Baca tanggal akhir langganan dari dialog cancel (tanpa konfirmasi),
+            lalu tentukan layer yang tersisa.</td>
+        <td>0 bln → layer 1 · 12 → layer 2 · 18 → layer 3 · 24 → layer 4 sekali.</td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td><code>bind card</code></td>
+        <td>Kalau dialog meminta metode bayar: klik <em>Add card</em>, isi nomor,
+            kedaluwarsa, CVC, nama, ZIP, lalu simpan.</td>
+        <td>Tiap kolom dibaca ulang; nilai yang tidak cocok diketik ulang.</td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td><code>layer 1</code></td>
+        <td>Buka dialog penawaran, baca total, tekan <em>Subscribe</em>.</td>
+        <td><code>$0.00</code> atau label <em>12-month free trial</em>.</td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td><code>layer 2</code></td>
+        <td>Upgrade ke paket 18 bulan.</td>
+        <td>Tanggal akhir ±18 bulan dari hari ini (selisih maksimal 1 hari).</td>
+      </tr>
+      <tr>
+        <td class="num">6</td>
+        <td><code>layer 3</code></td>
+        <td>Upgrade ke paket 24 bulan.</td>
+        <td>Tanggal akhir ±24 bulan.</td>
+      </tr>
+      <tr>
+        <td class="num">7</td>
+        <td><code>cancel</code></td>
+        <td>Play → <em>Manage</em> → <em>Cancel subscription</em> → konfirmasi.</td>
+        <td>Status harus <code>Canceled</code> + tanggal berakhir terbaca.</td>
+      </tr>
+      <tr>
+        <td class="num">8</td>
+        <td><code>detach card</code></td>
+        <td>Hapus kartu dari profil pembayaran akun; kartu tetap tersimpan di vault
+            untuk akun berikutnya.</td>
+        <td>Best effort — butuh persetujuan di HP, ditunggu sampai 300 detik.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted">Kolom <strong>step</strong> di tabel akun adalah nomor handler
+  terakhir yang dijalankan — 1–4 untuk layer, angka lebih besar untuk tahap
+  berikutnya.</p>
+</section>
+
+<section>
+  <h2>Format input</h2>
+  <p>Satu baris per item; pemisah boleh <code>|</code>, koma, titik koma, tab, atau spasi.</p>
+  <ul>
+    <li><strong>Kartu:</strong> <code>nomor|MM/YY|CVC</code> — contoh
+        <code>4111111111111111|08/29|123</code>. Nomor dan CVC masuk
+        <code>secrets.json</code>; yang ditampilkan hanya 4 digit terakhir.</li>
+    <li><strong>Akun:</strong> <code>email|password|seed_totp</code> — seed boleh
+        kosong kalau akun tanpa 2FA. Seed dinormalisasi (spasi/huruf besar diabaikan).</li>
+  </ul>
+  <p class="muted">Kartu dipakai bergilir: akun baru memakai kartu aktif yang paling
+  lama tidak dipakai. Tandai kartu <em>mati</em> kalau sudah tidak layak.</p>
+</section>
+
+<section>
+  <h2>Yang butuh tangan manusia</h2>
+  <ul>
+    <li><strong>Device prompt saat login</strong> — Google minta konfirmasi di HP.
+        Alur menunggu sampai 5 menit (tidak dihitung sebagai langkah gagal).</li>
+    <li><strong>Persetujuan hapus kartu</strong> — halaman pembayaran hanya menawarkan
+        "tap Yes on your phone". Alur mengirim permintaan lalu menunggu 300 detik.</li>
+    <li><strong>reCAPTCHA gambar</strong> — checkbox diklik otomatis; kalau Google
+        naik ke teka-teki gambar, selesaikan di jendela Chrome yang terbuka.</li>
+  </ul>
+  <p class="muted">Kalau keduanya tidak disetujui, langganan tetap aktif dan cancel
+  tetap berjalan — hanya kartu yang tertinggal di akun.</p>
+</section>
+
+<section>
+  <h2>Kalau gagal: baca baris ini di log</h2>
+  <table>
+    <thead><tr><th>Penanda di log</th><th>Artinya</th><th>Yang bisa dilakukan</th></tr></thead>
+    <tbody>
+      <tr><td><code>EGRESS … ≠ US</code></td>
+          <td>Egress bukan US.</td>
+          <td>Nyalakan VPN US, jalankan ulang.</td></tr>
+      <tr><td><code>LOGIN GAGAL</code></td>
+          <td>Login tidak selesai (password/TOTP/captcha).</td>
+          <td>Selesaikan manual di jendela Chrome, atau perbaiki password/seed di vault.</td></tr>
+      <tr><td><code>kolom CVC meleset</code></td>
+          <td>Isi kolom tidak sama dengan yang diketik (autofill ikut masuk).</td>
+          <td>Alur mengulang sendiri; kalau menetap, hapus profil Chrome akun itu.</td></tr>
+      <tr><td><code>tombol Add card tidak ditemukan</code></td>
+          <td>Dialog belum menampilkan form kartu.</td>
+          <td>Run ulang; kalau terus terjadi, cek screenshot <code>flow_L*.png</code>.</td></tr>
+      <tr><td><code>Google menolak: Something went wrong</code></td>
+          <td>Google menutup jalur upgrade (biasanya batas 24 bulan).</td>
+          <td>Normal untuk layer 4; alur lanjut ke cancel.</td></tr>
+      <tr><td><code>cancel terverifikasi</code></td>
+          <td>Status <code>Canceled</code> dan tanggal berakhir terbaca.</td>
+          <td>Tidak ada — akun selesai.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Data &amp; privasi</h2>
+  <p>Semua data hidup di data dir, tidak ada telemetri dan tidak ada panggilan ke
+  server selain Google (dan <code>ipwho.is</code> untuk cek negara):</p>
+  <p><code>{{ data_dir }}</code></p>
+  <ul>
+    <li><code>db.sqlite3</code> — metadata akun/kartu (tanpa nomor kartu/CVC).</li>
+    <li><code>secrets.json</code> — password, seed TOTP, nomor kartu, CVC (0600).</li>
+    <li><code>console.token</code> — token akses konsol.</li>
+    <li><code>profiles/</code> — profil Chrome per akun (cookie login).</li>
+    <li><code>artifacts/</code> — log run dan screenshot tiap layer.</li>
+  </ul>
+  <div class="warn">Jangan commit isi data dir. <code>secrets.json</code> memuat
+  kredensial dalam bentuk yang bisa dibaca siapa pun yang bisa membuka file itu —
+  perlindungannya izin file (0600 di direktori 0700), bukan Keychain.</div>
+</section>
+
+<footer>
+  Sumber &amp; pembanding:
+  <a href="https://github.com/worldonlyu/Google_AI_Pro_2Year_ZeroCost_Auto">zero-cost runner</a> ·
+  <a href="https://github.com/ade1256/google-ai-pro-farming-2-years">konsol awal</a> ·
+  <a href="https://github.com/dennykrst/google-ai-pro-automation">repo ini</a>
+</footer>
+
+</main>
+</body>
+</html>

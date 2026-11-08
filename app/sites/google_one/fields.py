@@ -19,12 +19,46 @@ import asyncio
 from playwright.async_api import Page
 
 
+async def _value(el) -> str:
+    try:
+        return await el.input_value(timeout=3000)
+    except Exception:
+        return ""
+
+
+async def _clear(el) -> None:
+    """Wipe a field: keyboard first, then the DOM value, because autofill can win
+    the race and put its own text back right after the delete."""
+    if not await _value(el):
+        return
+    try:
+        await el.click(timeout=4000)
+        await el.press("ControlOrMeta+a")
+        await el.press("Delete")
+    except Exception:
+        pass
+    if await _value(el):
+        try:
+            await el.evaluate(
+                "e => { e.value = ''; e.dispatchEvent(new Event('input',{bubbles:true})); }"
+            )
+        except Exception:
+            pass
+
+
 async def fill(page: Page, sel: str, value: str, *, tries: int = 3) -> bool:
     """Type `value` into the first match of `sel` and confirm it stuck.
 
     When the selector matches nothing the field is simply not on this screen —
     that is a miss, not a transient error, so bail at once instead of spending
     the click timeout three times over.
+
+    Chrome's password manager is why this verifies twice. It drops the password
+    saved from the Keychain into whichever field has focus, sometimes *after* our
+    keystrokes, which is how a login ended up submitting the saved password
+    instead of the one in the vault. Escape dismisses its popup, `autocomplete=
+    new-password` tells it not to offer anything, and the second read catches a
+    late overwrite.
     """
     try:
         await page.locator(sel).first.wait_for(state="attached", timeout=6000)
@@ -43,24 +77,16 @@ async def fill(page: Page, sel: str, value: str, *, tries: int = 3) -> bool:
             continue
 
         try:
-            current = await el.input_value(timeout=3000)
+            await el.press("Escape")          # tutup dropdown autofill
+            await el.evaluate("e => e.setAttribute('autocomplete', 'new-password')")
         except Exception:
-            current = ""
+            pass
 
-        if current == value:
+        if await _value(el) == value:
             return True
 
-        if current:  # clear only when there is something to clear
-            try:
-                await el.press("ControlOrMeta+a")
-                await el.press("Delete")
-            except Exception:
-                try:
-                    await el.evaluate(
-                        "e => { e.value = ''; e.dispatchEvent(new Event('input',{bubbles:true})); }"
-                    )
-                except Exception:
-                    pass
+        await _clear(el)
+        await asyncio.sleep(0.2)
 
         try:
             await el.press_sequentially(value, delay=60)
@@ -69,12 +95,13 @@ async def fill(page: Page, sel: str, value: str, *, tries: int = 3) -> bool:
             await asyncio.sleep(1.0)
             continue
 
-        await asyncio.sleep(0.35)  # let the input handler commit the value
-        try:
-            landed = await el.input_value(timeout=3000)
-        except Exception:
-            landed = ""
-
+        landed = ""
+        for wait in (0.35, 1.2):     # baca dua kali: autofill bisa menyusup telat
+            await asyncio.sleep(wait)
+            landed = await _value(el)
+            if landed and landed != value:
+                print(f"   kolom ditimpa isi lain (panjang {len(landed)}) — ulangi")
+                break
         if landed == value:
             return True
 

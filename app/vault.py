@@ -1,8 +1,8 @@
 """Account and card vault.
 
-Secrets live in Keychain; the database holds only references and metadata. Reads
-go through a process-lifetime cache because every `security` call is a
-subprocess (~50 ms) and a page refresh would otherwise call it once per row.
+Secrets live in `<data_dir>/secrets.json` (see `secrets`); the database holds
+only references and metadata. Reads go through a process-lifetime cache so a
+page refresh does not re-read and re-parse the file once per row.
 
 Card semantics: a card is reused across accounts, round-robin, until it is
 marked dead. `last_used_at` orders the rotation, so the least recently used
@@ -241,7 +241,7 @@ async def account_creds(email: str) -> tuple[str, str, str] | None:
 
     Tasks used to rebuild the id from the email local-part
     (`"acc_" + email.split("@")[0]`), but ids are random hex minted in
-    `add_account` — so the lookup always missed, Keychain returned "", and the
+    `add_account` — so the lookup always missed, the vault returned "", and the
     flow typed an empty password until it ran out of steps. The id has to come
     from the row, never from the address.
     """

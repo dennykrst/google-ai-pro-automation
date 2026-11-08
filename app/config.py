@@ -1,18 +1,50 @@
-"""Settings. Everything path- or secret-bearing lives outside the repo."""
+"""Settings. Everything path- or secret-bearing lives outside the repo.
+
+Data dir dipilih per platform, jadi kode yang sama jalan di macOS dan Windows:
+
+    macOS    ~/Library/Application Support/GoogleAIAutomation
+    Windows  %LOCALAPPDATA%\\GoogleAIAutomation
+    Linux    $XDG_DATA_HOME/GoogleAIAutomation (atau ~/.local/share/...)
+
+`GAI_DATA_DIR` menimpa semuanya — dipakai selftest dan run sekali pakai.
+"""
 
 from __future__ import annotations
 
+import os
 import secrets
 import stat
+import sys
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_NAME = "GaiConsole"
+APP_NAME = "GoogleAIAutomation"
+OLD_APP_NAME = "GaiConsole"      # nama data dir sebelum project di-rename
+
+
+def _base_dir() -> Path:
+    if sys.platform == "win32":
+        root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if root:
+            return Path(root)
+        return Path.home() / "AppData" / "Local"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
 
 
 def _default_data_dir() -> Path:
-    return Path.home() / "Library" / "Application Support" / APP_NAME
+    new = _base_dir() / APP_NAME
+    old = _base_dir() / OLD_APP_NAME
+    # Sekali saja: data dir lama dipindah supaya akun, kartu dan token console
+    # tidak hilang cuma karena project berganti nama.
+    if not new.exists() and old.exists():
+        try:
+            old.rename(new)
+        except OSError:
+            pass
+    return new
 
 
 class Settings(BaseSettings):
@@ -46,10 +78,11 @@ class Settings(BaseSettings):
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.profiles_dir, self.artifacts_dir):
             d.mkdir(parents=True, exist_ok=True)
-        try:
-            self.data_dir.chmod(stat.S_IRWXU)  # 0700: profile dirs hold live cookies
-        except OSError:
-            pass
+        if sys.platform != "win32":
+            try:
+                self.data_dir.chmod(stat.S_IRWXU)  # 0700: profile dirs hold live cookies
+            except OSError:
+                pass
 
     def load_or_create_token(self) -> str:
         """Console token. Without it, any local process can read the account list."""

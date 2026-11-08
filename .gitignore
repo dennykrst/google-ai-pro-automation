@@ -3,8 +3,16 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+build/
+dist/
+.pytest_cache/
 
-# Data lokal (semua di luar repo, dijaga kalau pernah disalin ke sini)
+# Data lokal. Semuanya memang hidup di data dir (di luar repo), tapi tetap
+# di-ignore supaya salinan yang tidak sengaja tertinggal tidak ikut ter-commit.
+# secrets.json = password, seed TOTP, nomor kartu, CVC. JANGAN pernah di-commit.
+secrets.json
+*.db
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
@@ -13,6 +21,7 @@ profiles/
 console.token
 .wheelhouse/
 .env
+*.log
 
 # macOS
 .DS_Store

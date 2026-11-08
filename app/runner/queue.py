@@ -26,6 +26,11 @@ class Runner:
         self._queued: set[str] = set()
         self._worker: asyncio.Task | None = None
         self.current: str | None = None
+        # Run terakhir yang sudah selesai. Log-nya tetap bisa dibaca sesudah run
+        # berhenti — kalau hanya `current` yang dipakai, panel di browser langsung
+        # kosong begitu proses keluar, termasuk saat keluar karena gagal.
+        self.last: str | None = None
+        self.last_status: str = "idle"
         self.proc: asyncio.subprocess.Process | None = None
         self.stopping = False
 
@@ -116,6 +121,8 @@ class Runner:
             status = "failed"
         await db.execute("UPDATE accounts SET status = ? WHERE id = ?", (status, acc_id))
         self.current = None
+        self.last = acc_id
+        self.last_status = status
 
 
 runner = Runner()
@@ -124,6 +131,23 @@ runner = Runner()
 def latest_log(acc_id: str) -> Path | None:
     files = sorted(settings.artifacts_dir.glob(f"run_{acc_id}_*.log"))
     return files[-1] if files else None
+
+
+def newest_log() -> tuple[str, Path] | None:
+    """Newest run log in the data dir, with the account id taken from its name.
+
+    Dipakai setelah console di-restart: `runner.last` masih kosong, tapi penyebab
+    run terakhir gagal tetap harus bisa dibaca. Nama file selalu
+    `run_<acc_id>_<epoch>.log`, jadi id-nya diambil dari bagian tengah.
+    """
+    files = sorted(settings.artifacts_dir.glob("run_*_*.log"))
+    if not files:
+        return None
+    path = files[-1]
+    bits = path.stem.split("_")
+    if len(bits) < 4 or not bits[-1].isdigit():
+        return None
+    return "_".join(bits[1:-1]), path
 
 
 def tail(path: Path, lines: int = 60) -> str:
