@@ -15,7 +15,7 @@ from urllib.parse import quote
 from . import db, runs, vault
 from .config import settings
 from .runner import queue
-from .security import COOKIE_NAME, require_token
+from .security import COOKIE_NAME, guard_request
 
 log = logging.getLogger("gai")
 
@@ -40,14 +40,18 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     token = settings.load_or_create_token()
     await db.migrate()
     queue.runner.start()
-    log.warning("console: http://%s:%d/?t=%s", settings.bind_host, settings.bind_port, token)
+    url = f"http://{settings.bind_host}:{settings.bind_port}/"
+    if settings.require_token or settings.allow_remote:
+        log.warning("console: %s?t=%s", url, token)
+    else:
+        log.warning("console: %s  (loopback, tanpa token)", url)
     yield
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Google AI Pro Automation", lifespan=lifespan,
                   docs_url=None, redoc_url=None)
-    guard = [Depends(require_token)]
+    guard = [Depends(guard_request)]
 
     @app.get("/healthz")
     async def healthz() -> JSONResponse:

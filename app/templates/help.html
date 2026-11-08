@@ -252,7 +252,10 @@
   <ul>
     <li><code>db.sqlite3</code> — metadata akun/kartu (tanpa nomor kartu/CVC).</li>
     <li><code>secrets.json</code> — password, seed TOTP, nomor kartu, CVC (0600).</li>
-    <li><code>console.token</code> — token akses konsol.</li>
+    <li><code>console.token</code> — token akses. Hanya dipakai kalau console
+        dibuka ke luar loopback (<code>GAI_ALLOW_REMOTE=1</code>) atau
+        <code>GAI_REQUIRE_TOKEN=1</code>; untuk pemakaian normal di mesin sendiri
+        cukup buka <code>http://127.0.0.1:8765/</code> tanpa token.</li>
     <li><code>profiles/</code> — profil Chrome per akun (cookie login).</li>
     <li><code>artifacts/</code> — log run dan screenshot tiap layer.</li>
   </ul>

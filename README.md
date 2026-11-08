@@ -61,7 +61,8 @@ tidak pernah menampilkan nomor kartu utuh, CVC, atau password.
 
 ## Batasan yang disengaja
 
-- Hanya mendengarkan di `127.0.0.1` dan wajib token 43 karakter (`?t=` → cookie).
+- Hanya mendengarkan di `127.0.0.1`. Cookie sesi diterbitkan otomatis; token
+  hanya dipakai kalau kamu sengaja membukanya ke jaringan (`GAI_ALLOW_REMOTE=1`).
 - Tidak ada telemetri, tidak ada panggilan keluar selain Google dan `ipwho.is`.
 - Beberapa titik tetap butuh manusia di HP (device prompt login, persetujuan hapus
   kartu, captcha gambar). Kalau tidak disetujui, langganan tetap aktif dan cancel
@@ -99,8 +100,13 @@ Pengerasan lain:
 - `requirements.lock` di-pin penuh **dengan sha256**, dipasang lewat
   `pip install --require-hashes`. Rilis baru yang dibajak tidak bisa masuk
   tanpa hash cocok. Lock ini khusus macOS; Windows memakai `requirements.txt`.
-- Console butuh token 43-char (`?t=` → cookie), dibandingkan constant-time.
-  Tanpa token, daftar akun tidak bisa dibaca proses lokal lain.
+- Akses console: **Host wajib loopback** (`127.0.0.1`, `::1`, `localhost`) — ini
+  yang menahan DNS rebinding. Untuk loopback, cookie diterbitkan otomatis pada
+  GET, jadi `http://127.0.0.1:8765/` langsung masuk tanpa `?t=`. **POST tetap
+  butuh cookie** (tidak diterbitkan untuk POST, dan cookie `samesite=strict` tidak
+  ikut pada request lintas situs), jadi form dari halaman lain tetap ditolak.
+  Token 43 karakter hanya wajib kalau console dibuka ke luar loopback
+  (`GAI_ALLOW_REMOTE=1`) atau `GAI_REQUIRE_TOKEN=1`.
 - Data dir `0700`, `db.sqlite3`, `console.token` dan `secrets.json` `0600`.
 - Password, seed TOTP, nomor kartu, dan CVC **hanya** di `secrets.json` di dalam
   data dir. Nol ketergantungan OS: modul `app/secrets.py` cuma menulis JSON
@@ -143,14 +149,19 @@ cd google-ai-pro-automation
 | Windows | `cd windows` lalu `powershell -ExecutionPolicy Bypass -File .\run.ps1` |
 
 Kedua launcher membuat `.venv` bila belum ada, memasang dependensi, lalu
-menyajikan konsol di `127.0.0.1:8765`. Buka:
+menyajikan konsol di `127.0.0.1:8765`. Buka saja:
 
 ```
-http://127.0.0.1:8765/?t=<isi console.token di data dir>
+http://127.0.0.1:8765/
 ```
 
-Data dir: macOS `~/Library/Application Support/GoogleAIAutomation`,
-Windows `%LOCALAPPDATA%\GoogleAIAutomation`. Token juga dicetak di log saat boot.
+Tidak perlu token untuk akses dari mesin yang sama. Data dir: macOS
+`~/Library/Application Support/GoogleAIAutomation`, Windows
+`%LOCALAPPDATA%\GoogleAIAutomation`.
+
+Kalau console dibuka ke jaringan (`GAI_BIND_HOST=0.0.0.0 GAI_ALLOW_REMOTE=1`),
+semua request wajib token — nilainya ada di `console.token` di data dir dan
+dicetak di log boot sebagai `?t=…`.
 
 Data dir lama (`.../GaiConsole`) dipindahkan otomatis sekali saat boot pertama,
 jadi akun, kartu, dan token console tidak hilang setelah project di-rename.

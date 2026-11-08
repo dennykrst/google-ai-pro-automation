@@ -63,6 +63,14 @@ class Settings(BaseSettings):
 
     console_token: str = ""
 
+    # Akses console. Default: hanya loopback, cookie diterbitkan otomatis untuk
+    # GET, jadi buka http://127.0.0.1:8765/ langsung masuk tanpa ?t=.
+    # require_token=True  → tetap minta token walau dari loopback.
+    # allow_remote=True   → izinkan Host non-loopback (mis. bind 0.0.0.0); token
+    #                       jadi wajib untuk semua request.
+    require_token: bool = False
+    allow_remote: bool = False
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "db.sqlite3"

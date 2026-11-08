@@ -22,6 +22,46 @@ from app.models import AccountCreate  # noqa: E402
 RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
 
+def test_security_policy() -> None:
+    """Loopback tanpa token, tapi POST butuh cookie dan Host asing ditolak."""
+
+    from app import security
+
+    assert security.host_is_local("127.0.0.1:8765")
+    assert security.host_is_local("localhost:8765")
+    assert security.host_is_local("LOCALHOST")
+    assert security.host_is_local("[::1]:8765")
+    assert security.host_is_local("::1")
+    assert not security.host_is_local("127.0.0.1.nip.io")
+    assert not security.host_is_local("10.0.0.5:8765")
+    assert not security.host_is_local("")
+    assert not security.host_is_local(None)
+
+    d = security.decide
+    local = {"require_token": False, "allow_remote": False}
+    assert d("127.0.0.1:8765", False, method="GET", **local) == security.ISSUE
+    assert d("127.0.0.1:8765", False, method="HEAD", **local) == security.ISSUE
+    # POST tanpa cookie tetap ditolak (cookie samesite=strict tidak ikut lintas situs)
+    assert d("127.0.0.1:8765", False, method="POST", **local) == security.REQUIRE
+    assert d("127.0.0.1:8765", True, method="POST", **local) == security.ALLOW
+    # DNS rebinding: Host dari domain lain tidak pernah dilayani
+    assert d("evil.example", True, method="GET", **local) == security.DENY
+    assert d("evil.example", False, method="GET", **local) == security.DENY
+    # dibuka ke LAN: semua request wajib token
+    remote = {"require_token": False, "allow_remote": True}
+    assert d("10.0.0.5:8765", True, method="GET", **remote) == security.ALLOW
+    assert d("10.0.0.5:8765", False, method="GET", **remote) == security.REQUIRE
+    # dipaksa token: GET loopback pun butuh kredensial
+    forced = {"require_token": True, "allow_remote": False}
+    assert d("127.0.0.1:8765", False, method="GET", **forced) == security.REQUIRE
+    assert d("127.0.0.1:8765", True, method="GET", **forced) == security.ALLOW
+
+    assert security.token_matches("abc", "abc")
+    assert not security.token_matches("abc", "abd")
+    assert not security.token_matches("", "abc")
+    assert not security.token_matches(None, "abc")
+
+
 def test_totp_rfc_vectors() -> None:
     cases = {59: "287082", 1111111109: "081804", 1234567890: "005924", 2000000000: "279037"}
     for at, expected in cases.items():
